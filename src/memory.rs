@@ -68,7 +68,18 @@ impl<A,D> EmuMemory<A,D>
         }
     }
 
+    #[allow(unused_variables)]  // TODO: remove
+    fn valid_address(&self, addr: &A) -> bool {
+        // TODO: adhere to alignment constraints, and write test to
+        // confirm.
+        true
+    }
+
     pub fn get(&mut self, addr: &A) -> Option<&D> {
+        if !self.valid_address(addr) {
+            return None;
+        }
+
         if let Some(data) = self.segments.get(addr) {
             Some(data)
         } else {
@@ -77,6 +88,10 @@ impl<A,D> EmuMemory<A,D>
     }
 
     pub fn get_mut(&mut self, addr: &A) -> Option<&mut D> {
+        if !self.valid_address(addr) {
+            return None;
+        }
+
         if let None = self.segments.get(addr) {
             self.segments.insert((*addr).clone(), self.default_data.clone());
         }
