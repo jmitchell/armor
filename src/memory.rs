@@ -40,14 +40,14 @@
 //! The initial design is embarassingly naive.
 //!
 //! Initially no memory is allocated. When there's a write to a valid
-//! address, if that address has never been used, real memory is
+//! address, and if that address has never been used, real memory is
 //! dynamically allocated and associated with that address. Freshly
-//! allocated memory is assigned to a default value. (Thus, reads to
-//! novel addresses can simply return this default value.) Writes are
-//! supported by getting a mutable reference to the data associated
-//! with an address. For now there is no mechanism for deallocation,
-//! so take care not to write to more addresses than the real machine
-//! can handle.
+//! allocated memory is assigned to a default value. (Reads to novel
+//! addresses don't incur any allocation because they can just return
+//! this default value.) Writes are supported by getting a mutable
+//! reference to the data associated with an address. There's no
+//! mechanism for deallocation, so take care not to write to more
+//! addresses than the real machine can handle.
 
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -59,18 +59,12 @@ pub struct EmuMemory<A,D> {
 
 impl<A,D> EmuMemory<A,D>
     where A: Eq + Hash + Clone,
-          D: Default + Clone
+          D: Clone
 {
-    pub fn new() -> EmuMemory<A,D> {
+    pub fn new(default: D) -> EmuMemory<A,D> {
         EmuMemory {
             segments: HashMap::new(),
-            default_data: Default::default(),
-        }
-    }
-
-    fn init_address(&mut self, addr: &A) {
-        if let None = self.segments.get(addr) {
-            self.segments.insert((*addr).clone(), self.default_data.clone());
+            default_data: default,
         }
     }
 
@@ -83,7 +77,9 @@ impl<A,D> EmuMemory<A,D>
     }
 
     pub fn get_mut(&mut self, addr: &A) -> Option<&mut D> {
-        self.init_address(addr);
+        if let None = self.segments.get(addr) {
+            self.segments.insert((*addr).clone(), self.default_data.clone());
+        }
         self.segments.get_mut(addr)
     }
 }
@@ -94,7 +90,7 @@ mod test {
 
     #[test]
     fn read_and_write_at_one_address() {
-        let mut mem: EmuMemory<u32,u32> = EmuMemory::new();
+        let mut mem: EmuMemory<u32,u32> = EmuMemory::new(0u32);
         let addr: u32 = 1024;
         let data: u32 = 99;
 
