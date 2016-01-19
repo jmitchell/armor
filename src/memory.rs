@@ -1,5 +1,15 @@
 #![allow(dead_code)]
 
+// TODO: Change current `EmuMemory` to something like `AddressSpace`.
+
+// TODO: Make a trait for anything that can be mapped to a portion of
+// the address space. RAM, ROM, memory-mapped I/O, etc would implement
+// it. Given a collection of them, identify whether there are any
+// collisions. Assuming no collisions, map each of them to appropriate
+// place in the address space. Eventually it may help to have a second
+// trait for unmapping a memory-mappable item, e.g. memory mapped
+// files.
+
 //! Processors are simply machines that consume bits from a memory
 //! space, compute based on those bits, and emit results to the memory
 //! space. A memory space can be thought of as a rectangular grid of
@@ -46,17 +56,30 @@
 //! addresses don't incur any allocation because they can just return
 //! this default value.) Writes are supported by getting a mutable
 //! reference to the data associated with an address. There's no
-//! mechanism for deallocation, so take care not to write to more
-//! addresses than the real machine can handle.
+//! mechanism for deallocation, so take care not to write (or acquire
+//! mutable references) to more addresses than the real machine can
+//! handle.
 
 use std::collections::HashMap;
 use std::hash::Hash;
+// use std::ops::Add;
+
+// trait Offset : Sized + Eq + Ord {
+
+// }
+
+// trait Address : Sized + Eq + Ord + Hash + Clone + Add<Offset> {
+
+// }
 
 pub struct EmuMemory<A,D> {
     segments: HashMap<A,D>,
     default_data: D,
 }
 
+// Each address `A` uniquely identifies a single byte in the memory
+// space. Each datum `D` is the data that can be fetched via some
+// address.
 impl<A,D> EmuMemory<A,D>
     where A: Eq + Hash + Clone,
           D: Clone
@@ -72,6 +95,9 @@ impl<A,D> EmuMemory<A,D>
     fn valid_address(&self, addr: &A) -> bool {
         // TODO: adhere to alignment constraints, and write test to
         // confirm.
+
+        // TODO: accomodate memory map presented in
+        // http://infocenter.arm.com/help/topic/com.arm.doc.den0001c/DEN0001C_principles_of_arm_memory_maps.pdf
         true
     }
 
@@ -83,6 +109,10 @@ impl<A,D> EmuMemory<A,D>
         if let Some(data) = self.segments.get(addr) {
             Some(data)
         } else {
+            // TODO: Consider changing return type so it's possible to
+            // tell clients they've read from memory which hasn't ever
+            // been written to. Needs to be balanced against
+            // constraints of real physical RAM.
             Some(&self.default_data)
         }
     }
