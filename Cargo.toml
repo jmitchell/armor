@@ -1,0 +1,4 @@
+[package]
+name = "armor"
+version = "0.1.0"
+authors = ["Jacob Mitchell <jmitchell@member.fsf.org>"]
