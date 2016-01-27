@@ -369,8 +369,6 @@ impl RegisterFile {
     // TODO: What mechanism clears condition flags? When?
 }
 
-// TODO: Pipelines (ASDG 2.3). Start with 3-stage.
-
 // TODO(low): exceptions, interrupts, and vector table (ASDG 2.4)
 
 // TODO(low): core extensions (ASDG 2.5)

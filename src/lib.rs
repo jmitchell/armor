@@ -1,7 +1,6 @@
 pub mod memory;
 
 mod registers;
-mod pipeline;                   // TODO
 mod barrel_shifter;             // TODO
 
 // TODO: ALU
