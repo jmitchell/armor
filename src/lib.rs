@@ -1,4 +1,4 @@
-pub mod memory;
+pub mod address;
 
 mod registers;
 mod barrel_shifter;             // TODO
