@@ -57,52 +57,57 @@ trait Region : Addressable {
     }
 }
 
-// /// A trait for a region of addressable space that can lease control
-// /// over its subregions.
-// trait LeasableRegion : Region {
-//     /// Check if a candidate's region is available for lease, meaning
-//     /// it's fully contained by this region and doesn't overlap with
-//     /// any of the currently leased subregions.
-//     fn available_for_lease(&self, candidate: Box<Region>) -> bool;
+/// A trait for a region of addressable space that can lease control
+/// over its subregions.
+trait LeasableRegion : Region {
+    /// Check if a candidate's region is available for lease, meaning
+    /// it's fully contained by this region and doesn't overlap with
+    /// any of the currently leased subregions.
+    fn available_for_lease(&self, candidate: &Region) -> bool;
 
-//     /// Try to lease a subregion to a candidate region. Only succeeds
-//     /// if `available_for_lease` is true.
-//     fn lease(&mut self, candidate: Box<Region>) -> Option<&mut Box<Region>>;
+    /// Try to lease a subregion to a candidate region. Only succeeds
+    /// if `available_for_lease` is true.
+    fn lease(&mut self, candidate: Box<Region>) ->
+        Option<&mut Box<Region>>;
 
-//     fn leased_subregions(&self) -> Vec<&Region>;
+    fn leased_subregions(&self) -> &[Box<Region>];
 
-//     fn leased_subregions_mut(&mut self) -> Vec<&mut Region>;
+    fn leased_subregions_mut(&mut self) -> &mut [Box<Region>];
 
-//     // /// Check if an address is controlled by this region, but not by
-//     // /// one of its leased subregions.
-//     // ///
-//     // /// Typically, a region gains control of an address in its range
-//     // /// by mapping it to an addressable interface, e.g. RAM.
-//     // fn controls_address(&self, addr: Address) -> bool;
+    fn leased_subregion_at(&self, addr: Address) ->
+        Option<&Box<Region>>;
 
-//     // /// Find the leased subregion that controls some address.
-//     // fn lease_for_address<R : Region>(&self, addr: Address) -> Option<&R>;
-// }
+    fn leased_subregion_at_mut(&mut self, addr: Address) ->
+        Option<&mut Box<Region>>;
 
-struct AddressSpace<'a> {
-    start: Address,
-    end: Address,
-    mapped_regions: Vec<Box<Region + 'a>>,
+    // /// Check if an address is controlled by this region, but not by
+    // /// one of its leased subregions.
+    // ///
+    // /// Typically, a region gains control of an address in its range
+    // /// by mapping it to an addressable interface, e.g. RAM.
+    // fn controls_address(&self, addr: Address) -> bool;
+
+    // /// Find the leased subregion that controls some address.
+    // fn lease_for_address<R : Region>(&self, addr: Address) -> Option<&R>;
 }
 
-impl<'a> AddressSpace<'a> {
-    fn new() -> AddressSpace<'a> {
+struct AddressSpace {
+    start: Address,
+    end: Address,
+    mapped_regions: Vec<Box<Region>>,
+}
+
+impl AddressSpace {
+    fn new() -> AddressSpace {
         AddressSpace {
             start: 0x00000000,
             end:   0xffffffff,
             mapped_regions: vec![],
         }
     }
+}
 
-
-    // TODO: extract into a LeasableRegion trait once the type and
-    // borrow checker issues are resolved.
-
+impl LeasableRegion for AddressSpace {
     fn available_for_lease(&self, candidate: &Region) -> bool {
         if !self.contains_region(candidate) {
             return false
@@ -116,7 +121,7 @@ impl<'a> AddressSpace<'a> {
     }
 
     fn lease(&mut self, candidate: Box<Region>) ->
-        Option<&mut Box<Region + 'a>>
+        Option<&mut Box<Region>>
     {
         if self.available_for_lease(&*candidate) {
             self.mapped_regions.push(candidate);
@@ -126,22 +131,24 @@ impl<'a> AddressSpace<'a> {
         }
     }
 
-    fn leased_subregions(&self) -> &[Box<Region + 'a>] {
+    fn leased_subregions(&self) -> &[Box<Region>] {
         &self.mapped_regions[..]
     }
 
-    fn leased_subregions_mut(&mut self) -> &mut [Box<Region + 'a>] {
+    fn leased_subregions_mut(&mut self) -> &mut [Box<Region>] {
         &mut self.mapped_regions[..]
     }
 
-    fn leased_subregion_at(&self, addr: Address) -> Option<&Box<Region + 'a>> {
+    fn leased_subregion_at(&self, addr: Address) ->
+        Option<&Box<Region>>
+    {
         self.leased_subregions()
             .iter()
             .find(|ref r| r.contains_address(&addr))
     }
 
     fn leased_subregion_at_mut(&mut self, addr: Address) ->
-        Option<&mut Box<Region + 'a>>
+        Option<&mut Box<Region>>
     {
         self.leased_subregions_mut()
             .iter_mut()
@@ -149,7 +156,7 @@ impl<'a> AddressSpace<'a> {
     }
 }
 
-impl<'a> Addressable for AddressSpace<'a> {
+impl Addressable for AddressSpace {
     fn get(&self, addr: Address) -> Option<&Cell> {
         match self.leased_subregion_at(addr) {
             Some(region) => region.get(addr),
@@ -165,7 +172,7 @@ impl<'a> Addressable for AddressSpace<'a> {
     }
 }
 
-impl<'a> Region for AddressSpace<'a> {
+impl Region for AddressSpace {
     fn start(&self) -> Address {
         self.start
     }
@@ -249,6 +256,7 @@ mod test {
         Cell,
         Addressable,
         Region,
+        LeasableRegion,
         AddressSpace,
         RandomAccessMemory,
     };
