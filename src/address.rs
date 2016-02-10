@@ -105,6 +105,14 @@ impl AddressSpace {
             mapped_regions: vec![],
         }
     }
+
+    fn from_range(a: Address, b: Address) -> AddressSpace {
+        AddressSpace {
+            start: cmp::min(a, b),
+            end: cmp::max(a, b),
+            mapped_regions: vec![],
+        }
+    }
 }
 
 impl LeasableRegion for AddressSpace {
@@ -237,18 +245,6 @@ impl Region for RandomAccessMemory {
 // implementation will only handle 32-bit addresses.
 
 
-
-// TODO: Make a trait for anything that can be mapped to a portion of
-// the address space. RAM, ROM, memory-mapped I/O, vector table
-// interrupt handlers, etc would implement it.
-//
-// Given a collection of them, identify whether there are any
-// collisions. Assuming no collisions, map each of them to appropriate
-// place in the address space. Eventually it may help to have a second
-// trait for unmapping a memory-mappable item, e.g. memory mapped
-// files.
-
-
 #[cfg(test)]
 mod test {
     use address::{
@@ -338,5 +334,38 @@ mod test {
         assert_eq!(2, address_space.leased_subregions().len());
         assert!(address_space.leased_subregion_at(63).is_some());
         assert!(address_space.leased_subregion_at(64).is_some());
+    }
+
+    #[test]
+    fn build_deep_tree_of_ram_chips() {
+        let mut address_space = AddressSpace::new();
+
+        let mut ram512 = AddressSpace::from_range(0, 511);
+
+        let mut ram256_low = AddressSpace::from_range(0, 255);
+        let mut ram256_high = AddressSpace::from_range(256, 511);
+
+        assert!(ram256_low.lease(
+            Box::new(RandomAccessMemory::new(0, 63))).is_some());
+        assert!(ram256_low.lease(
+            Box::new(RandomAccessMemory::new(64, 127))).is_some());
+        assert!(ram256_low.lease(
+            Box::new(RandomAccessMemory::new(128, 191))).is_some());
+        assert!(ram256_low.lease(
+            Box::new(RandomAccessMemory::new(192, 255))).is_some());
+
+        assert!(ram256_high.lease(
+            Box::new(RandomAccessMemory::new(256, 319))).is_some());
+        assert!(ram256_high.lease(
+            Box::new(RandomAccessMemory::new(320, 383))).is_some());
+        assert!(ram256_high.lease(
+            Box::new(RandomAccessMemory::new(384, 447))).is_some());
+        assert!(ram256_high.lease(
+            Box::new(RandomAccessMemory::new(448, 511))).is_some());
+
+        assert!(ram512.lease(Box::new(ram256_low)).is_some());
+        assert!(ram512.lease(Box::new(ram256_high)).is_some());
+
+        assert!(address_space.lease(Box::new(ram512)).is_some());
     }
 }
