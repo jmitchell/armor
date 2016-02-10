@@ -1,6 +1,9 @@
 #![allow(dead_code)]
 
-use std::cmp;
+use std::{
+    cmp,
+    usize,
+};
 use std::collections::HashMap;
 
 
@@ -54,6 +57,25 @@ trait Region : Addressable {
     fn overlaps_region(&self, region: &Region) -> bool {
         self.contains_address(&(*region).start()) ||
             self.contains_address(&(*region).end())
+    }
+
+    // TODO: test on a region with nested subregions
+    fn write_cells(&mut self, data: Vec<Cell>, addr: Address) {
+        assert!(addr >= self.start());
+
+        // TODO: clean up using CellCount
+        let last_addr = addr + data.len() as u64 - 1;
+        assert!(last_addr <= self.end());
+
+        for i in addr..(last_addr + 1) {
+            match self.get_mut(i) {
+                Some(cell) => {
+                    assert!(i <= usize::MAX as u64);
+                    *cell = data[i as usize];
+                },
+                None => panic!(),
+            }
+        }
     }
 }
 
