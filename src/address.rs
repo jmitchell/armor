@@ -79,16 +79,6 @@ trait LeasableRegion : Region {
 
     fn leased_subregion_at_mut(&mut self, addr: Address) ->
         Option<&mut Box<Region>>;
-
-    // /// Check if an address is controlled by this region, but not by
-    // /// one of its leased subregions.
-    // ///
-    // /// Typically, a region gains control of an address in its range
-    // /// by mapping it to an addressable interface, e.g. RAM.
-    // fn controls_address(&self, addr: Address) -> bool;
-
-    // /// Find the leased subregion that controls some address.
-    // fn lease_for_address<R : Region>(&self, addr: Address) -> Option<&R>;
 }
 
 struct AddressSpace {
@@ -190,9 +180,6 @@ impl Region for AddressSpace {
     }
 }
 
-// impl LeasableRegion for AddressSpace {
-// }
-
 
 struct RandomAccessMemory {
     start: Address,
@@ -243,7 +230,9 @@ impl Region for RandomAccessMemory {
 // addresses. To leave room for future extension, the emulator
 // represents addresses using u64's. However, the initial memory map
 // implementation will only handle 32-bit addresses.
-
+//
+// TODO: Use region and leasing features to build the standard ARM
+// 32-bit memory map.
 
 #[cfg(test)]
 mod test {
