@@ -84,14 +84,14 @@ trait Region : Addressable {
 //     // fn lease_for_address<R : Region>(&self, addr: Address) -> Option<&R>;
 // }
 
-struct AddressSpace {
+struct AddressSpace<'a> {
     start: Address,
     end: Address,
-    mapped_regions: Vec<Box<Region>>,
+    mapped_regions: Vec<Box<Region + 'a>>,
 }
 
-impl AddressSpace {
-    fn new() -> AddressSpace {
+impl<'a> AddressSpace<'a> {
+    fn new() -> AddressSpace<'a> {
         AddressSpace {
             start: 0x00000000,
             end:   0xffffffff,
@@ -104,6 +104,9 @@ impl AddressSpace {
     // borrow checker issues are resolved.
 
     fn available_for_lease(&self, candidate: &Region) -> bool {
+        if !self.contains_region(candidate) {
+            return false
+        }
         for subregion in self.mapped_regions.iter() {
             if subregion.overlaps_region(candidate) {
                 return false
@@ -112,7 +115,9 @@ impl AddressSpace {
         return true
     }
 
-    fn lease(&mut self, candidate: Box<Region>) -> Option<&mut Box<Region>> {
+    fn lease(&mut self, candidate: Box<Region>) ->
+        Option<&mut Box<Region + 'a>>
+    {
         if self.available_for_lease(&*candidate) {
             self.mapped_regions.push(candidate);
             self.mapped_regions.last_mut()
@@ -121,28 +126,30 @@ impl AddressSpace {
         }
     }
 
-    fn leased_subregions(&self) -> &[Box<Region>] {
+    fn leased_subregions(&self) -> &[Box<Region + 'a>] {
         &self.mapped_regions[..]
     }
 
-    fn leased_subregions_mut(&mut self) -> &mut [Box<Region>] {
+    fn leased_subregions_mut(&mut self) -> &mut [Box<Region + 'a>] {
         &mut self.mapped_regions[..]
     }
 
-    fn leased_subregion_at(&self, addr: Address) -> Option<&Box<Region>> {
+    fn leased_subregion_at(&self, addr: Address) -> Option<&Box<Region + 'a>> {
         self.leased_subregions()
             .iter()
             .find(|ref r| r.contains_address(&addr))
     }
 
-    fn leased_subregion_at_mut(&mut self, addr: Address) -> Option<&mut Box<Region>> {
+    fn leased_subregion_at_mut(&mut self, addr: Address) ->
+        Option<&mut Box<Region + 'a>>
+    {
         self.leased_subregions_mut()
             .iter_mut()
             .find(|ref r| r.contains_address(&addr))
     }
 }
 
-impl Addressable for AddressSpace {
+impl<'a> Addressable for AddressSpace<'a> {
     fn get(&self, addr: Address) -> Option<&Cell> {
         match self.leased_subregion_at(addr) {
             Some(region) => region.get(addr),
@@ -158,7 +165,7 @@ impl Addressable for AddressSpace {
     }
 }
 
-impl Region for AddressSpace {
+impl<'a> Region for AddressSpace<'a> {
     fn start(&self) -> Address {
         self.start
     }
@@ -237,14 +244,17 @@ impl Region for RandomAccessMemory {
 
 #[cfg(test)]
 mod test {
-
-    use address::Cell;
-    use address::AddressSpace;
-    use address::Addressable;
-    use address::RandomAccessMemory;
+    use address::{
+        Address,
+        Cell,
+        Addressable,
+        Region,
+        AddressSpace,
+        RandomAccessMemory,
+    };
 
     #[test]
-    fn lease_portions_of_address_space() {
+    fn lease_first_4k_of_address_space() {
         let mut address_space = AddressSpace::new();
         assert_eq!(0, address_space.leased_subregions().len());
 
@@ -252,30 +262,73 @@ mod test {
         assert!(address_space.available_for_lease(&ram4k));
         assert!(address_space.lease(Box::new(ram4k)).is_some());
         assert_eq!(1, address_space.leased_subregions().len());
-        assert!(!address_space.available_for_lease(&RandomAccessMemory::new(0, 0)));
+        assert!(!address_space
+                .available_for_lease(&RandomAccessMemory::new(0, 0)));
         assert!(address_space.leased_subregion_at(0).is_some());
-        assert!(address_space.leased_subregion_at(0xffffffffffffffff).is_none());
+        assert!(address_space
+                .leased_subregion_at(0xffffffffffffffff).is_none());
 
         let mut orig_val: Cell = 0;
         let mut new_val: Cell = 0;
+        let addr: Address = 50;
         {
-            let mut inner_cell = address_space.get_mut(0).unwrap();
+            let mut inner_cell = address_space.get_mut(addr).unwrap();
             orig_val = *inner_cell;
             *inner_cell += 1;
             assert!(*inner_cell != orig_val);
         }
-        new_val = *address_space.get(0).unwrap();
+        new_val = *address_space.get(addr).unwrap();
         assert!(new_val != orig_val);
+    }
 
-        // TODO: Evict ram4k.
+    #[test]
+    fn fail_to_sublease_region_partway_out_of_bounds() {
+        let mut address_space = AddressSpace::new();
+        assert_eq!(address_space.end, 0xffffffff);
+        let ram_oob = RandomAccessMemory::new(address_space.end,
+                                              address_space.end + 1);
+        assert_eq!(0, address_space.leased_subregions().len());
+        assert!(!address_space.available_for_lease(&ram_oob));
+        assert!(address_space.lease(Box::new(ram_oob)).is_none());
+        assert_eq!(0, address_space.leased_subregions().len());
+        assert!(address_space.available_for_lease(
+            &RandomAccessMemory::new(address_space.start,
+                                     address_space.end)));
+        assert!(address_space.leased_subregion_at(address_space.start).is_none());
+        assert!(address_space.leased_subregion_at(address_space.end).is_none());
+    }
 
-        // TODO: Create a new region partly outside the bounds of
-        // address_space. Demonstrate it can't acquire a lease.
+    #[test]
+    fn fail_to_sublease_to_two_overlapping_subregions() {
+        let mut address_space = AddressSpace::new();
+        let upper_bound = 1024;
+        assert!(upper_bound <= address_space.end());
+        let ram_x = RandomAccessMemory::new(0, 63);
+        let ram_y = RandomAccessMemory::new(63, upper_bound);
+        assert!(ram_x.overlaps_region(&ram_y));
 
-        // TODO: Create 3 smaller regions, such that two can both
-        // acquire leases from address_space, but the third can't.
+        assert!(address_space.lease(Box::new(ram_x)).is_some());
+        assert!(!address_space.available_for_lease(&ram_y));
+        assert!(address_space.lease(Box::new(ram_y)).is_none());
+        assert_eq!(1, address_space.leased_subregions().len());
+        assert!(address_space.leased_subregion_at(63).is_some());
+        assert!(address_space.leased_subregion_at(64).is_none());
+    }
 
-        // TODO: Evict the region overlapping the third, and then
-        // lease the third.
+    #[test]
+    fn successfully_sublease_to_two_nonoverlapping_regions() {
+        let mut address_space = AddressSpace::new();
+        let upper_bound = 1024;
+        assert!(upper_bound <= address_space.end());
+        let ram_x = RandomAccessMemory::new(0, 63);
+        let ram_y = RandomAccessMemory::new(64, upper_bound);
+        assert!(!ram_x.overlaps_region(&ram_y));
+
+        assert!(address_space.lease(Box::new(ram_x)).is_some());
+        assert!(address_space.available_for_lease(&ram_y));
+        assert!(address_space.lease(Box::new(ram_y)).is_some());
+        assert_eq!(2, address_space.leased_subregions().len());
+        assert!(address_space.leased_subregion_at(63).is_some());
+        assert!(address_space.leased_subregion_at(64).is_some());
     }
 }
