@@ -59,7 +59,6 @@ trait Region : Addressable {
             self.contains_address(&(*region).end())
     }
 
-    // TODO: test on a region with nested subregions
     fn write_cells(&mut self, data: Vec<Cell>, addr: Address) {
         assert!(addr >= self.start());
 
@@ -77,6 +76,8 @@ trait Region : Addressable {
             }
         }
     }
+
+    // TODO: read_cells
 }
 
 /// A trait for a region of addressable space that can lease control
@@ -348,7 +349,7 @@ mod test {
     }
 
     #[test]
-    fn build_deep_tree_of_ram_chips() {
+    fn build_deep_tree_of_ram_chips_and_write_to_all_cells() {
         let mut address_space = AddressSpace::new();
 
         let mut ram512 = AddressSpace::from_range(0, 511);
@@ -378,5 +379,16 @@ mod test {
         assert!(ram512.lease(Box::new(ram256_high)).is_some());
 
         assert!(address_space.lease(Box::new(ram512)).is_some());
+
+        fn val_for_address(addr: Address) -> u8 {
+            (addr % 256) as u8
+        }
+        let data = (0..512).map(val_for_address).collect::<Vec<_>>();
+        address_space.write_cells(data, 0);
+
+        // TODO: replace with multi-cell reads once implemented
+        for i in 0..512 {
+            assert_eq!(*address_space.get(i).unwrap(), val_for_address(i));
+        }
     }
 }
