@@ -77,7 +77,21 @@ trait Region : Addressable {
         }
     }
 
-    // TODO: read_cells
+    fn read_cells(&self, low: Address, high: Address) -> Option<Vec<Cell>> {
+        assert!(low <= high);
+        let size = (high - low + 1) as usize;
+        let mut ret = Vec::with_capacity(size);
+        for i in low..(high + 1) {
+            match self.get(i) {
+                Some(&cell) => {
+                    assert!(i <= usize::MAX as u64);
+                    ret.push(cell);
+                },
+                None => return None
+            }
+        }
+        Some(ret)
+    }
 }
 
 /// A trait for a region of addressable space that can lease control
@@ -383,12 +397,13 @@ mod test {
         fn val_for_address(addr: Address) -> u8 {
             (addr % 256) as u8
         }
-        let data = (0..512).map(val_for_address).collect::<Vec<_>>();
-        address_space.write_cells(data, 0);
-
-        // TODO: replace with multi-cell reads once implemented
-        for i in 0..512 {
-            assert_eq!(*address_space.get(i).unwrap(), val_for_address(i));
+        fn data() -> Vec<Cell> {
+            (0..512).map(val_for_address).collect()
         }
+        address_space.write_cells(data(), 0);
+
+        let recorded_data = address_space.read_cells(0, 511);
+        assert!(recorded_data.is_some());
+        assert_eq!(recorded_data.unwrap(), data());
     }
 }
