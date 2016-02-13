@@ -5,7 +5,7 @@ use std::{
     usize,
 };
 use std::collections::HashMap;
-
+use std::ops::{Index, IndexMut};
 
 /// Unique identifier for a location in an address space.
 pub type Address = u64;
@@ -25,6 +25,20 @@ trait Addressable {
 
     /// Lookup a mutable cell reference at a particular address.
     fn get_mut(&mut self, addr: Address) -> Option<&mut Cell>;
+}
+
+impl Index<Address> for Addressable {
+    type Output = Cell;
+
+    fn index<'a>(&'a self, index: Address) -> &'a Cell {
+        self.get(index).unwrap()
+    }
+}
+
+impl IndexMut<Address> for Addressable {
+    fn index_mut<'a>(&'a mut self, index: Address) -> &'a mut Cell {
+        self.get_mut(index).unwrap()
+    }
 }
 
 /// A trait describing a contiguous region of addressable space.
