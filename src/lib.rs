@@ -1,6 +1,8 @@
-pub mod address;
-
+mod address;
 mod registers;
+mod processor;
+mod computer;
+
 mod barrel_shifter;             // TODO
 
 // TODO: ALU

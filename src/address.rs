@@ -132,7 +132,7 @@ trait LeasableRegion : Region {
         Option<&mut Box<Region>>;
 }
 
-struct AddressSpace {
+pub struct AddressSpace {
     start: Address,
     end: Address,
     mapped_regions: Vec<Box<Region>>,
@@ -285,6 +285,42 @@ impl Region for RandomAccessMemory {
 // TODO: Use region and leasing features to build the standard ARM
 // 32-bit memory map.
 
+// TODO: What is HiVECs? It's referenced in "Principles of ARM Memory
+// Maps", sec 3.1.6, P15.
+
+// 32-bit memory map, according to section 4.1.
+//
+// 4GB  +-----------------+ <- 32-bit
+//      | DRAM            |
+//      |                 |
+// 2GB  +-----------------+
+//      | Mapped I/O      |
+// 1GB  +-----------------+
+//      | ROM & RAM & I/O |
+// 0GB  +-----------------+ 0
+
+struct MemMap32 {
+    address_space: AddressSpace,
+}
+
+impl MemMap32 {
+    fn new() -> MemMap32 {
+        let rom_ram_io = AddressSpace::from_range(0x00000000, 0x3fffffff);
+        let mapped_io = AddressSpace::from_range(0x40000000, 0x7fffffff);
+        let dram = RandomAccessMemory::new(0x80000000, 0xffffffff);
+
+        let mut map = AddressSpace::from_range(0x00000000, 0xffffffff);
+        map.lease(Box::new(rom_ram_io));
+        map.lease(Box::new(mapped_io));
+        map.lease(Box::new(dram));
+
+        MemMap32 {
+            address_space: map,
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use address::{
@@ -295,6 +331,7 @@ mod test {
         LeasableRegion,
         AddressSpace,
         RandomAccessMemory,
+        MemMap32,
     };
 
     #[test]
@@ -419,5 +456,12 @@ mod test {
         let recorded_data = address_space.read_cells(0, 511);
         assert!(recorded_data.is_some());
         assert_eq!(recorded_data.unwrap(), data());
+    }
+
+    #[test]
+    fn create_32_bit_arm_memory_map() {
+        let mm = MemMap32::new();
+        assert_eq!(mm.address_space.start(), 0x00000000);
+        assert_eq!(mm.address_space.end(), 0xffffffff);
     }
 }

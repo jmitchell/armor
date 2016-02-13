@@ -238,7 +238,7 @@ enum RegisterBank {
 #[derive(PartialEq, Eq, Hash)]
 struct RegisterID(RegisterBank, ProcessorMode);
 
-struct RegisterFile {
+pub struct RegisterFile {
     table: HashMap<RegisterID, Register32>,
 }
 
@@ -250,7 +250,6 @@ impl RegisterFile {
     }
 
     pub fn reset(&mut self) {
-        // TODO(low): make a clean interface for generating this
         let standard_registers = vec![
             RegisterID(RegisterBank::R0, ProcessorMode::User),
             RegisterID(RegisterBank::R1, ProcessorMode::User),
@@ -297,9 +296,6 @@ impl RegisterFile {
 
         self.cpsr_mut().set_mode(ProcessorMode::Supervisor);
         self.cpsr_mut().set_instruction_set(InstructionSet::ARM);
-
-        // TODO: any other initialization logic, like initial program
-        // counter (PC)?
     }
 
     fn cpsr(&self) -> &Register32 {
