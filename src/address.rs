@@ -271,43 +271,77 @@ impl Region for RandomAccessMemory {
     }
 }
 
+struct ReadOnlyMemory {
+    start: Address,
+    end: Address,
+    cells: Vec<Cell>,
+}
+
+impl ReadOnlyMemory {
+    fn new(a: Address, b: Address, data: Vec<Cell>) -> ReadOnlyMemory {
+        let low = cmp::min(a, b);
+        let high = cmp::max(a, b);
+        let cell_count = (high - low + 1) as usize;
+        assert!(data.len() <= cell_count);
+
+        ReadOnlyMemory {
+            start: low,
+            end: high,
+            cells: data,
+        }
+    }
+}
+
+impl Addressable for ReadOnlyMemory {
+    fn get(&self, addr: Address) -> Option<&Cell> {
+        let index = (addr - self.start) as usize;
+        self.cells.get(index)
+    }
+
+    fn get_mut(&mut self, _addr: Address) -> Option<&mut Cell> {
+        None
+    }
+}
+
+impl Region for ReadOnlyMemory {
+    fn start(&self) -> Address {
+        self.start
+    }
+
+    fn end(&self) -> Address {
+        self.end
+    }
+}
 
 
-// A white paper published in 2012 called "Principles of ARM Memory
-// Maps" primary source guiding the implementation of this module.
-//
-// The white paper describes 32-bit, 36-bit, and 42-bit memory maps
-// already in use, and proposes memory maps for 44-bit and 48-bit
-// addresses. To leave room for future extension, the emulator
-// represents addresses using u64's. However, the initial memory map
-// implementation will only handle 32-bit addresses.
-//
-// TODO: Use region and leasing features to build the standard ARM
-// 32-bit memory map.
-
-// TODO: What is HiVECs? It's referenced in "Principles of ARM Memory
-// Maps", sec 3.1.6, P15.
-
-// 32-bit memory map, according to section 4.1.
-//
-// 4GB  +-----------------+ <- 32-bit
-//      | DRAM            |
-//      |                 |
-// 2GB  +-----------------+
-//      | Mapped I/O      |
-// 1GB  +-----------------+
-//      | ROM & RAM & I/O |
-// 0GB  +-----------------+ 0
-
-struct MemMap32 {
+/// "Principles of ARM Memory Maps" illustrates the 32-bit memory map
+/// as shown here:
+///
+/// 4GB  +-----------------+ <- 32-bit
+///      | DRAM            |
+///      |                 |
+/// 2GB  +-----------------+
+///      | Mapped I/O      |
+/// 1GB  +-----------------+
+///      | ROM & RAM & I/O |
+/// 0GB  +-----------------+ 0
+pub struct MemMap32 {
     address_space: AddressSpace,
 }
 
 impl MemMap32 {
-    fn new() -> MemMap32 {
-        let rom_ram_io = AddressSpace::from_range(0x00000000, 0x3fffffff);
+    /// Create a new 32-bit memory map, with the provided boot machine
+    /// code loaded into a ROM chip mapped to address 0x00000000.
+    pub fn new(boot_code: Vec<Cell>) -> MemMap32 {
+        assert!(boot_code.len() < 0x00010000);
+
+        let mut rom_ram_io = AddressSpace::from_range(0x00000000, 0x3fffffff);
         let mapped_io = AddressSpace::from_range(0x40000000, 0x7fffffff);
         let dram = RandomAccessMemory::new(0x80000000, 0xffffffff);
+
+        let boot_rom = ReadOnlyMemory::new(0x00000000, 0x0000ffff, boot_code);
+        rom_ram_io.lease(Box::new(boot_rom));
+        // TODO: ROM, RAM, SoC I/O (0x00010000 - 0x3fffffff)
 
         let mut map = AddressSpace::from_range(0x00000000, 0xffffffff);
         map.lease(Box::new(rom_ram_io));
@@ -318,8 +352,12 @@ impl MemMap32 {
             address_space: map,
         }
     }
+
+    // TODO: Support installing SoC I/O devices and mapped I/O.
 }
 
+
+// TODO(low): Support larger memory maps.
 
 #[cfg(test)]
 mod test {
@@ -460,7 +498,7 @@ mod test {
 
     #[test]
     fn create_32_bit_arm_memory_map() {
-        let mm = MemMap32::new();
+        let mm = MemMap32::new(vec![0x01, 0x02, 0x03]);
         assert_eq!(mm.address_space.start(), 0x00000000);
         assert_eq!(mm.address_space.end(), 0xffffffff);
     }

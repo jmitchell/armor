@@ -18,8 +18,6 @@ mod barrel_shifter;             // TODO
 // TODO: Sign extender
 
 
-
-
 #[cfg(test)]
 mod test {
     // TODO: verify that a new RegisterFile starts in supervisor mode

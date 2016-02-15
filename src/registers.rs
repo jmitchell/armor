@@ -365,6 +365,12 @@ impl RegisterFile {
     // TODO: What mechanism clears condition flags? When?
 }
 
+impl Default for RegisterFile {
+    fn default() -> RegisterFile {
+        RegisterFile::new()
+    }
+}
+
 // TODO(low): exceptions, interrupts, and vector table (ASDG 2.4)
 
 // TODO(low): core extensions (ASDG 2.5)
