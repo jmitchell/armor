@@ -19,7 +19,7 @@ pub type Cell = u8;
 pub type CellCount = u64;
 
 /// A trait for looking up cells associated with an address.
-trait Addressable {
+pub trait Addressable {
     /// Lookup the cell at a particular address.
     fn get(&self, addr: Address) -> Option<&Cell>;
 
@@ -42,7 +42,7 @@ impl IndexMut<Address> for Addressable {
 }
 
 /// A trait describing a contiguous region of addressable space.
-trait Region : Addressable {
+pub trait Region : Addressable {
     /// Lowest address in the region.
     fn start(&self) -> Address;
 
@@ -110,7 +110,7 @@ trait Region : Addressable {
 
 /// A trait for a region of addressable space that can lease control
 /// over its subregions.
-trait LeasableRegion : Region {
+pub trait LeasableRegion : Region {
     /// Check if a candidate's region is available for lease, meaning
     /// it's fully contained by this region and doesn't overlap with
     /// any of the currently leased subregions.
@@ -326,7 +326,7 @@ impl Region for ReadOnlyMemory {
 ///      | ROM & RAM & I/O |
 /// 0GB  +-----------------+ 0
 pub struct MemMap32 {
-    address_space: AddressSpace,
+    pub address_space: AddressSpace,
 }
 
 impl MemMap32 {
@@ -501,5 +501,8 @@ mod test {
         let mm = MemMap32::new(vec![0x01, 0x02, 0x03]);
         assert_eq!(mm.address_space.start(), 0x00000000);
         assert_eq!(mm.address_space.end(), 0xffffffff);
+        let boot_code = mm.address_space.read_cells(0, 2).unwrap();
+        assert_eq!(boot_code, vec![0x01, 0x02, 0x03]);
+        assert!(mm.address_space.get(3).is_none());
     }
 }

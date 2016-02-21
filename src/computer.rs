@@ -10,8 +10,8 @@ use processor;
 // debugging features, like breakpoints, run, step, etc.
 
 pub struct Computer {
-    cpu: processor::Processor,
-    mem: address::MemMap32,
+    pub cpu: processor::Processor,
+    pub mem: address::MemMap32,
 }
 
 impl Computer {

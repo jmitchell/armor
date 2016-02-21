@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashMap;
+use std::fmt;
 
 pub trait Register {
     fn _bit_width(&self) -> u8;
@@ -34,8 +35,8 @@ pub trait Register {
     }
 }
 
-struct Register32 {
-    bits: u32,
+pub struct Register32 {
+    pub bits: u32,
 }
 
 impl Register for Register32 {
@@ -57,8 +58,15 @@ impl Register for Register32 {
     }
 }
 
-#[derive(PartialEq, Eq, Hash)]
-enum ProcessorMode {
+impl fmt::Debug for Register32 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO: reverse the bits?
+        write!(f, "Register32 {{ {:0<32b} }}", self.bits)
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub enum ProcessorMode {
     Abort,                      // failed attempt to access memory
     FastInterruptRequest,       // fast interrupt system
     InterruptRequest,           // interrupt system
@@ -68,7 +76,7 @@ enum ProcessorMode {
     User,                       // used for programs and applications
 }
 
-enum ConditionFlag {
+pub enum ConditionFlag {
     Negative,                   // N
     Zero,                       // Z
     Carry,                      // C
@@ -76,18 +84,18 @@ enum ConditionFlag {
     // Saturation,                 // Q
 }
 
-enum InterruptMask {
+pub enum InterruptMask {
     IRQ,
     FIQ,
 }
 
-enum InstructionSet {
+pub enum InstructionSet {
     ARM,
     Thumb,
     // Jazelle,                    // Java-optimized IS
 }
 
-trait ProgramStatusRegister : Register {
+pub trait ProgramStatusRegister : Register {
     fn mode(&self) -> Option<ProcessorMode>;
 
     fn set_mode(&mut self, ProcessorMode);
@@ -226,8 +234,8 @@ impl ProgramStatusRegister for Register32 {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
-enum RegisterBank {
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
+pub enum RegisterBank {
     R0, R1, R2, R3,
     R4, R5, R6, R7,
     R8, R9, R10, R11,
@@ -235,9 +243,10 @@ enum RegisterBank {
     CPSR, SPSR,
 }
 
-#[derive(PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Debug)]
 struct RegisterID(RegisterBank, ProcessorMode);
 
+#[derive(Debug)]
 pub struct RegisterFile {
     table: HashMap<RegisterID, Register32>,
 }
@@ -298,7 +307,7 @@ impl RegisterFile {
         self.cpsr_mut().set_instruction_set(InstructionSet::ARM);
     }
 
-    fn cpsr(&self) -> &Register32 {
+    pub fn cpsr(&self) -> &Register32 {
         self.table
             .get(&RegisterID(RegisterBank::CPSR, ProcessorMode::User))
             .unwrap()

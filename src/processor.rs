@@ -3,7 +3,7 @@
 use registers;
 
 pub struct Processor {
-    register_file: registers::RegisterFile,
+    pub register_file: registers::RegisterFile,
     // TODO: add other parts as needed
 }
 
