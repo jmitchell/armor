@@ -6,7 +6,7 @@ use std::io::prelude::*;
 use std::io;
 use armor::computer::Computer;
 
-type CommandHandler = &'static Fn(&[&str], &mut Computer) -> Result<(), String>;
+type CommandHandler = &'static Fn(&[&str], &mut Computer);
 
 struct Command {
     name: &'static str,
@@ -30,40 +30,47 @@ impl Command {
         }
     }
 
-    fn find(id: &[&str]) -> Option<&'static Command> {
+    fn find<'a>(id: &'a [&'a str]) ->
+        Option<(&'static Command, &'a [&'a str])>
+    {
         let mut cmd: Option<&Command> = None;
-        for name in id {
-            // TODO: DRY
+        for i in 0..id.len() {
             match cmd {
                 Some(command) => {
+                    let mut updated = false;
                     for c in command.subcommands {
-                        if &c.name == name {
+                        if c.name == id[i] {
                             cmd = Some(&c);
+                            updated = true;
                             break;
                         }
                     }
-                    if cmd.is_none() {
-                        break;
+                    if !updated {
+                        return Some((cmd.unwrap(), &id[i..]));
                     }
                 },
                 None => {
-                    for c in commands {
-                        if &c.name == name {
+                    for c in COMMANDS {
+                        if c.name == id[i] {
                             cmd = Some(&c);
                             break;
                         }
                     }
                     if cmd.is_none() {
-                        break;
+                        return None
                     }
                 },
             }
         }
-        cmd
+
+        match cmd {
+            Some(c) => Some((c, &[])),
+            None => None,
+        }
     }
 }
 
-const commands: &'static [Command] = &[
+const COMMANDS: &'static [Command] = &[
     Command::new(
         "help",
         "Display documentation for supported commands",
@@ -73,10 +80,10 @@ const commands: &'static [Command] = &[
         "print",
         "Print current state of the emulated computer",
         &handle_print,
-        print_subcommands),
+        PRINT_SUBCOMMANDS),
 ];
 
-const print_subcommands: &'static [Command] = &[
+const PRINT_SUBCOMMANDS: &'static [Command] = &[
     Command::new(
         "registers",
         "Show the CPU registers",
@@ -89,9 +96,9 @@ const print_subcommands: &'static [Command] = &[
         &[]),
 ];
 
-fn handle_help(args: &[&str], computer: &mut Computer) -> Result<(), String> {
-    match Command::find(&args[0..1]) {
-        Some(cmd) => {
+fn handle_help(args: &[&str], computer: &mut Computer) {
+    match Command::find(args) {
+        Some((cmd, _)) => {
             println!("
 Subcommands for '{}' command
 ----------------------------------
@@ -106,42 +113,31 @@ Subcommands for '{}' command
 Top-level commands
 ------------------
 ");
-            for c in commands {
+            for c in COMMANDS {
                 println!("    {}: {}", c.name, c.doc_string);
             }
             println!("    exit: Exit the debugger without saving anything");
         },
     }
-
-    println!("");
-    return Ok(())
 }
 
-fn handle_print(args: &[&str], computer: &mut Computer) -> Result<(), String> {
-    match Command::find(&args[0..1]) {
-        Some(subcmd) => return (subcmd.handler)(&args[1..], computer),
-        None => {
-            println!("TODO: specialized help for print");
-        }
-    }
-    return Ok(())
+fn handle_print(args: &[&str], computer: &mut Computer) {
+    println!("TODO: specialized help for print");
 }
 
-fn handle_print_registers(args: &[&str], computer: &mut Computer) -> Result<(), String> {
+fn handle_print_registers(args: &[&str], computer: &mut Computer) {
     println!("TODO: print registers");
-    return Ok(())
 }
 
-fn handle_print_code(args: &[&str], computer: &mut Computer) -> Result<(), String> {
+fn handle_print_code(args: &[&str], computer: &mut Computer) {
     println!("TODO: print code");
-    return Ok(())
 }
 
 
 fn debugger_repl(computer: &mut Computer) -> Result<(), io::Error> {
     loop {
         print!("> ");
-        io::stdout().flush();
+        try!(io::stdout().flush());
 
         let mut input = String::new();
         try!(io::stdin().read_line(&mut input));
@@ -160,9 +156,10 @@ fn debugger_repl(computer: &mut Computer) -> Result<(), io::Error> {
                     }).collect::<Vec<_>>();
 
                 assert!(words.len() > 0);
-                match Command::find(&words[0..1]) {
-                    Some(ref cmd) => {
-                        (cmd.handler)(&words[1..], computer);
+                match Command::find(&words) {
+                    Some((cmd, args)) => {
+                        (cmd.handler)(args, computer);
+                        println!("");
                     },
                     None => println!("Unrecognized command '{}'.
 Type 'help' to see supported commands.
@@ -181,5 +178,7 @@ ARMOR Debugging Interface
 =========================
 ");
 
-    debugger_repl(&mut Computer::new(vec![]));
+    let boot_code = vec![];
+    let computer = &mut Computer::new(boot_code);
+    debugger_repl(computer);
 }

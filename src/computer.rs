@@ -22,18 +22,7 @@ impl Computer {
         }
     }
 
-    pub fn power_on(&mut self) {
-        // TODO: initialize registers
-        loop {
-            self.execute_next_instruction();
-        }
-    }
-
-    pub fn power_off(&mut self) {
-        // TODO
-    }
-
-    fn execute_next_instruction(&mut self) {
+    pub fn execute_next_instruction(&mut self) {
         // TODO
     }
 }
