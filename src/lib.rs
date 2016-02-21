@@ -1,7 +1,7 @@
 mod address;
 mod registers;
 mod processor;
-mod computer;
+pub mod computer;
 
 mod barrel_shifter;             // TODO
 

@@ -9,16 +9,31 @@ use processor;
 // derivative information like the current mode. Support basic
 // debugging features, like breakpoints, run, step, etc.
 
-struct Computer {
+pub struct Computer {
     cpu: processor::Processor,
     mem: address::MemMap32,
 }
 
 impl Computer {
-    fn new(boot_code: Vec<address::Cell>) -> Computer {
+    pub fn new(boot_code: Vec<address::Cell>) -> Computer {
         Computer {
             cpu: Default::default(),
             mem: address::MemMap32::new(boot_code),
         }
+    }
+
+    pub fn power_on(&mut self) {
+        // TODO: initialize registers
+        loop {
+            self.execute_next_instruction();
+        }
+    }
+
+    pub fn power_off(&mut self) {
+        // TODO
+    }
+
+    fn execute_next_instruction(&mut self) {
+        // TODO
     }
 }
