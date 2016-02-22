@@ -60,7 +60,8 @@ impl Register for Register32 {
 
 impl fmt::Debug for Register32 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: reverse the bits?
+        // TODO: reverse the bits? (NB: the '<' in the format string
+        // may be wrong too.)
         write!(f, "Register32 {{ {:0<32b} }}", self.bits)
     }
 }

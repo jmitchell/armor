@@ -62,15 +62,20 @@ impl Command {
 
 const COMMANDS: &'static [Command] = &[
     Command(
-        "help",
-        "Display documentation for supported commands",
-        &handle_help,
-        &[]),
-    Command(
         "print",
         "Print current state of the emulated computer",
         &handle_print,
         PRINT_SUBCOMMANDS),
+    Command(
+        "step",
+        "Execute next instruction",
+        &handle_step,
+        &[]),
+    Command(
+        "help",
+        "Display documentation for supported commands",
+        &handle_help,
+        &[]),
 ];
 
 const PRINT_SUBCOMMANDS: &'static [Command] = &[
@@ -111,6 +116,10 @@ Top-level commands
     }
 }
 
+fn handle_step(_args: &[&str], computer: &mut Computer) {
+    computer.execute_next_instruction();
+}
+
 fn handle_print(_args: &[&str], _computer: &mut Computer) {
     println!("TODO: print");
 }
@@ -140,7 +149,7 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
         (pc_addr + amount) as u64
     };
 
-    let ref mem = computer.mem.address_space;
+    // let ref mem = computer.mem.address_space;
     let mut addr = low;
     while addr <= high {
         if addr == pc_addr as u64 {
@@ -149,10 +158,13 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
             print!("\t ");
         }
         print!(" 0x{:08x}: ", addr);
-        match mem.read_cells(addr, addr+3) {
-            None => println!("[uninitialized]"),
-            Some(cells) => println!("0x{:02x}{:02x}{:02x}{:02x}",
-                                    cells[0], cells[1], cells[2], cells[3]),
+        // TODO: Is the u-boot.bin code really little endian, or is
+        // there a problem with how the bits are printed?
+        match computer.mem.get32(addr, false) {
+            None => println!("[unitialized]"),
+            Some(word) => {
+                println!("{:#?}", computer.cpu.decode_instruction(word));
+            },
         }
         addr += 4;
     }
@@ -204,7 +216,22 @@ ARMOR Debugging Interface
 =========================
 ");
 
-    let boot_code = vec![0x01, 0x02, 0x03, 0x04];
+    // First several instructions from a u-boot binary compiled on a
+    // Raspberry Pi 2.
+    let boot_code = vec![
+        // Vector table starting at 0x00000000.
+        0xbe, 0x00, 0x00, 0xea, // Reset (supervisor)
+        0x14, 0xf0, 0x9f, 0xe5, // Undefined instruction (undefined)
+        0x14, 0xf0, 0x9f, 0xe5, // Software interrupt (supervisor)
+        0x14, 0xf0, 0x9f, 0xe5, // Abort - prefetch (abort)
+        0x14, 0xf0, 0x9f, 0xe5, // Abort - data (abort)
+        0x14, 0xf0, 0x9f, 0xe5, // Reserved (reserved)
+        0x14, 0xf0, 0x9f, 0xe5, // IRQ
+        0x14, 0xf0, 0x9f, 0xe5, // FIQ
+        // End of vector table
+        0x60, 0x80, 0x00, 0x00,
+        0xc0, 0x80, 0x00, 0x00,
+    ];
     let computer = &mut Computer::new(boot_code);
     debugger_repl(computer).is_ok();
 }

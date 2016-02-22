@@ -3,6 +3,7 @@
 use std::{
     cmp,
     usize,
+    mem,
 };
 use std::collections::HashMap;
 use std::ops::{Index, IndexMut};
@@ -350,6 +351,26 @@ impl MemMap32 {
 
         MemMap32 {
             address_space: map,
+        }
+    }
+
+    pub fn get32(&self, addr: Address, big_endian: bool) -> Option<u32> {
+        assert_eq!(1, mem::size_of::<Cell>());
+        match self.address_space.read_cells(addr, addr+3) {
+            None => None,
+            Some(cells) => {
+                if big_endian {
+                    Some(((cells[0] as u32) << 24) +
+                         ((cells[1] as u32) << 16) +
+                         ((cells[2] as u32) << 8) +
+                         (cells[3] as u32))
+                } else {
+                    Some(((cells[3] as u32) << 24) +
+                         ((cells[2] as u32) << 16) +
+                         ((cells[1] as u32) << 8) +
+                         (cells[0] as u32))
+                }
+            }
         }
     }
 
