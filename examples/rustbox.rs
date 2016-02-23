@@ -5,20 +5,22 @@ use std::default::Default;
 use rustbox::{Color, RustBox};
 use rustbox::Key;
 
-struct Rectangle {
+struct Rectangle<'a> {
     x_min: usize,
     y_min: usize,
     x_max: usize,
     y_max: usize,
+    rb: &'a RustBox
 }
 
-impl Rectangle {
-    fn new(x_min: usize, y_min: usize, x_max: usize, y_max: usize) -> Rectangle {
+impl<'a> Rectangle<'a> {
+    fn new(x_min: usize, y_min: usize, x_max: usize, y_max: usize, rb: &'a RustBox) -> Rectangle {
         Rectangle {
             x_min: x_min,
             y_min: y_min,
             x_max: x_max,
             y_max: y_max,
+            rb: rb,
         }
     }
 
@@ -43,7 +45,7 @@ impl Rectangle {
     }
 
     fn inside(&self) -> Rectangle {
-        Rectangle::new(self.x_min+1, self.y_min+1, self.x_max-1, self.y_max-1)
+        Rectangle::new(self.x_min+1, self.y_min+1, self.x_max-1, self.y_max-1, self.rb)
     }
 
     fn print_header(&self, rb: &RustBox, fg: Color, bg: Color, s: &str) {
@@ -57,27 +59,59 @@ impl Rectangle {
     }
 }
 
+// TODO: Move toward Drawable model. Make specialized Drawable structs
+// as necessary. Make a collection of Drawables Drawable.
+
+// TODO: Support a notion of a rectangular drawable region, that can
+// own Drawables. The owned Drawables can only draw within the
+// region's borders.
+
+trait Drawable<'a> {
+    fn rustbox(&self) -> &'a RustBox;
+    fn draw(&self);
+}
+
+impl<'a> Drawable<'a> for Rectangle<'a> {
+    fn rustbox(&self) -> &'a RustBox {
+        self.rb
+    }
+
+    fn draw(&self) {
+        self.draw_border(self.rustbox(), Color::Red);
+    }
+}
+
 fn main() {
-    let rustbox = match RustBox::init(Default::default()) {
+    let rb = match RustBox::init(Default::default()) {
         Result::Ok(v) => v,
         Result::Err(e) => panic!("{}", e),
     };
 
-    rustbox.print(1, 1, rustbox::RB_BOLD, Color::White, Color::Black, "Hello, world!");
-    rustbox.print(1, 3, rustbox::RB_BOLD, Color::White, Color::Black,
-                  "Press 'q' to quit.");
+    rb.print(3, 3, rustbox::RB_BOLD, Color::White, Color::Black,
+             "Press 'q' to quit.");
 
-    let outer_border = Rectangle::new(0, 0, rustbox.width()-1, rustbox.height()-1);
-    outer_border.draw_border(&rustbox, Color::Blue);
-    outer_border.print_header(&rustbox, Color::White, Color::Black, "Hello World");
+    let outer_border = Rectangle::new(0, 0, rb.width()-1, rb.height()-1, &rb);
+    outer_border.draw_border(&rb, Color::Blue);
+    outer_border.print_header(&rb, Color::White, Color::Black, "Hello World");
+    outer_border.draw();
 
-    let x1 = outer_border.inside();
-    x1.draw_border(&rustbox, Color::Red);
-    x1.print_header(&rustbox, Color::White, Color::Blue, "Hello World");
+    let start_y = 3;
+    let addrs = (0..255).cycle().take(100*4-1).collect::<Vec<u8>>();
+    for j in 0..addrs.len()/4 {
+        let i = j * 4;
+        let v: u32 = ((addrs[i] as u32) << 24) +
+            ((addrs[i+1] as u32) << 16) +
+            ((addrs[i+2] as u32) << 8) +
+            addrs[i+4] as u32;
+        rb.print(3, start_y+j, rustbox::RB_NORMAL, Color::White, Color::Black,
+                 &format!("{:#08x}: ", i));
+        rb.print(13, start_y+j, rustbox::RB_NORMAL, Color::White, Color::Blue,
+                 &format!("{}", v));
+    }
 
     loop {
-        rustbox.present();
-        match rustbox.poll_event(false) {
+        rb.present();
+        match rb.poll_event(false) {
             Ok(rustbox::Event::KeyEvent(key)) => {
                 match key {
                     Key::Char('q') => { break; }
