@@ -160,12 +160,16 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
         print!(" 0x{:08x}: ", addr);
         // TODO: Is the u-boot.bin code really little endian, or is
         // there a problem with how the bits are printed?
+        //
+        // There are claims that RPI2 is little endian by default, and
+        // pre-compiled big-endian kernels aren't well known.
+        // (see http://raspberrypi.stackexchange.com/questions/7279/big-endian-distribution-for-the-raspberry-pi)
         match computer.mem.get32(addr, false) {
             None => println!("[unitialized]"),
             Some(word) => {
                 match computer.cpu.decode_instruction(word) {
-                    None => println!("[invalid instruction]"),
-                    Some(instr) => println!("{:#?}", instr),
+                    None => println!("[invalid or unrecognized instruction]: {:032b}", word),
+                    Some(instr) => println!("{:?}", instr),
                 }
             },
         }

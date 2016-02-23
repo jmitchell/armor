@@ -305,13 +305,13 @@ impl Instruction {
             Some(cond) => {
                 match (code >> 24) & 0b1111 {
                     0b0100 => {
-                        panic!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
+                        println!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
                     },
                     0b0101 => {
-                        panic!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, W, and Imm12");
+                        println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, W, and Imm12");
                     },
                     0b0110 => {
-                        panic!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and shift op");
+                        println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and shift op");
                     },
                     0b1010 => {
                         mnemonic = Some(Mnemonic::B);
@@ -320,11 +320,11 @@ impl Instruction {
                             offset: code & 0b111111111111111111111111,
                         });
                     },
-                    x => panic!("Unrecognized bits [27:24]: {:04b}", x),
+                    x => println!("Unrecognized bits [27:24]: {:04b}", x),
                 }
             },
             None => {
-                panic!("TODO: decode unconditional instructions");
+                println!("TODO: decode unconditional instructions");
             },
         }
 
