@@ -163,7 +163,10 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
         match computer.mem.get32(addr, false) {
             None => println!("[unitialized]"),
             Some(word) => {
-                println!("{:#?}", computer.cpu.decode_instruction(word));
+                match computer.cpu.decode_instruction(word) {
+                    None => println!("[invalid instruction]"),
+                    Some(instr) => println!("{:#?}", instr),
+                }
             },
         }
         addr += 4;
