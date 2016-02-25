@@ -205,6 +205,63 @@ pub enum BarrelShiftTemplate {
     RRX(RegisterBank),
 }
 
+fn decode_shift(src_reg: RegisterBank, shift: u32, shift_size: u32, reg: Option<RegisterBank>) ->
+    Option<BarrelShiftTemplate>
+{
+    debug_assert!(shift_size <= 32 || reg.is_some());
+    match shift {
+        0b00 => {
+            match reg {
+                None => Some(BarrelShiftTemplate::LSL(src_reg, Either::Left(shift_size))),
+                Some(rs) => Some(BarrelShiftTemplate::LSL(src_reg, Either::Right(rs))),
+            }
+        },
+        0b01 => {
+            match reg {
+                None => {
+                    let n = if shift_size == 0 {
+                        32u32
+                    } else {
+                        shift_size
+                    };
+                    Some(BarrelShiftTemplate::LSR(src_reg, Either::Left(n)))
+                },
+                Some(rs) => Some(BarrelShiftTemplate::LSR(src_reg, Either::Right(rs))),
+            }
+        },
+        0b10 => {
+            match reg {
+                None => {
+                    let n = if shift_size == 0 {
+                        32u32
+                    } else {
+                        shift_size
+                    };
+                    Some(BarrelShiftTemplate::ASR(src_reg, Either::Left(n)))
+                },
+                Some(rs) => Some(BarrelShiftTemplate::ASR(src_reg, Either::Right(rs))),
+            }
+        },
+        0b11 => {
+            match reg {
+                None => {
+                    if shift_size == 0 {
+                        Some(BarrelShiftTemplate::RRX(src_reg))
+                    } else {
+                        Some(BarrelShiftTemplate::ROR(src_reg, Either::Left(shift_size)))
+                    }
+                },
+                Some(rs) => Some(BarrelShiftTemplate::ROR(src_reg, Either::Right(rs))),
+            }
+        },
+        _ => {
+            // 'The shift value is implicit: for PKHBT it is 00. For
+            // PKHTB it is 10. For SAT it is 2*sh.'
+            panic!("TODO: see last row in Table B.4");
+        },
+    }
+}
+
 #[derive(PartialEq, Eq, Debug)]
 enum InstructionTemplate {
     // Comparisons: CMN, CMP, TEQ, TST
@@ -304,6 +361,34 @@ impl Instruction {
         match decode_condition(code >> 28) {
             Some(cond) => {
                 match (code >> 24) & 0b1111 {
+                    0b0001 => {
+                        // Cond_S_Rd_N
+                        if code & (1 << 23) == 0 {
+                            println!("TODO");
+                        } else {
+                            if code & (1 << 4) == 0 {
+                                if code & (1 << 21) == 0 {
+                                    println!("TODO: ORR, BIC")
+                                } else {
+                                    // TODO: BarrelShiftTemplate from shift, shift_size, and Rm
+
+                                    // mnemonic = Some(if code & (1 << 22) == 0 {
+                                    //     Mnemonic::MOV
+                                    // } else {
+                                    //     Mnemonic::MVN
+                                    // });
+                                    // template = Some(InstructionTemplate::Cond_S_Rd_N {
+                                    //     cond: cond,
+                                    //     s_flag: code & (1 << 20) == 1,
+                                    //     rd: decode_register((code >> 12) & 0b1111).unwrap(),
+                                    //     n: ,
+                                    // });
+                                }
+                            } else {
+                                println!("TODO");
+                            }
+                        }
+                    },
                     0b0100 => {
                         println!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
                     },
@@ -317,7 +402,14 @@ impl Instruction {
                         mnemonic = Some(Mnemonic::B);
                         template = Some(InstructionTemplate::Cond_Offset {
                             cond: cond,
-                            offset: code & 0b111111111111111111111111,
+                            offset: code & ((1 << 25) - 1),
+                        });
+                    },
+                    0b1011 => {
+                        mnemonic = Some(Mnemonic::BL);
+                        template = Some(InstructionTemplate::Cond_Offset {
+                            cond: cond,
+                            offset: code & ((1 << 25) - 1),
                         });
                     },
                     x => println!("Unrecognized bits [27:24]: {:04b}", x),
