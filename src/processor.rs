@@ -369,16 +369,22 @@ impl Instruction {
         let mut mnemonic: Option<Mnemonic> = None;
         let mut template: Option<InstructionTemplate> = None;
 
-        match Condition::decode(code >> 28) {
+        let bits = |hi: u16, lo: u16| -> u32 {
+            debug_assert!(lo <= hi && hi < 32);
+            let mask = (1 << (hi - lo + 2)) - 1;
+            (code >> lo) & mask
+        };
+
+        match Condition::decode(bits(31, 28)) {
             Some(cond) => {
-                match (code >> 24) & 0b1111 {
+                match bits(27, 24) {
                     0b0001 => {
                         // Cond_S_Rd_N
-                        if code & (1 << 23) == 0 {
+                        if bits(23, 23) == 0 {
                             println!("TODO");
                         } else {
-                            if code & (1 << 4) == 0 {
-                                if code & (1 << 21) == 0 {
+                            if bits(4, 4) == 0 {
+                                if bits(21, 21) == 0 {
                                     println!("TODO: ORR, BIC")
                                 } else {
                                     // TODO: BarrelShiftOp from shift, shift_size, and Rm
@@ -414,14 +420,14 @@ impl Instruction {
                         mnemonic = Some(Mnemonic::B);
                         template = Some(InstructionTemplate::Cond_Offset {
                             cond: cond,
-                            offset: code & ((1 << 25) - 1),
+                            offset: bits(23, 0),
                         });
                     }
                     0b1011 => {
                         mnemonic = Some(Mnemonic::BL);
                         template = Some(InstructionTemplate::Cond_Offset {
                             cond: cond,
-                            offset: code & ((1 << 25) - 1),
+                            offset: bits(23, 0),
                         });
                     }
                     x => println!("Unrecognized bits [27:24]: {:04b}", x),
