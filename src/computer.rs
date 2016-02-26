@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 
 use address;
+use address::Region;
 use processor;
+use registers;
 
 // TODO: Support serializing and deserializing to a human-readable file.
 
@@ -12,6 +14,7 @@ use processor;
 pub struct Computer {
     pub cpu: processor::Processor,
     pub mem: address::MemMap32,
+    pub big_endian: bool,
 }
 
 impl Computer {
@@ -19,10 +22,51 @@ impl Computer {
         Computer {
             cpu: Default::default(),
             mem: address::MemMap32::new(boot_code),
+            big_endian: false,  // TODO: look up endianness in the CPSR instead.
         }
     }
 
     pub fn execute_next_instruction(&mut self) {
-        // TODO
+        let pc_addr = self.cpu.register_file
+            .lookup(registers::RegisterBank::R15).unwrap().bits;
+        match self.instruction_at(&pc_addr) {
+            None => panic!(""),
+            Some(instr) => if self.condition_satisfied(&instr) {
+                match instr.mnemonic {
+                    processor::Mnemonic::B => {
+                        match self.cpu.register_file.lookup_mut(registers::RegisterBank::R15) {
+                            None => panic!(),
+                            Some(mut pc) => if let processor::InstructionTemplate::Cond_Offset {
+                                cond: _,
+                                offset: offset,
+                            } = instr.args {
+                                *pc = registers::Register32 {
+                                    bits: pc.bits + 8 + (offset << 2),
+                                };
+                            }
+
+                        }
+                    },
+                    _ => panic!("TODO: handle instruction {:?}", instr),
+                }
+            }
+        }
+
+    }
+
+    pub fn instruction_at(&self, addr: &u32) -> Option<processor::Instruction> {
+        debug_assert!(*addr % 4 == 0);
+        debug_assert!(*addr <= self.mem.address_space.end() as u32);
+        match self.mem.get32(*addr as address::Address, self.big_endian) {
+            None => None,
+            Some(word) => self.cpu.decode_instruction(word),
+        }
+    }
+
+    fn condition_satisfied(&self, cond: &processor::Instruction) -> bool {
+        // TODO: read CPSR's condition flags and compare against
+        // instruction's cond (if it exists; otherwise, default to
+        // true).
+        true
     }
 }

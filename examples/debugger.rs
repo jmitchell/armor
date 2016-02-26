@@ -159,9 +159,10 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
         // There are claims that RPI2 is little endian by default, and
         // pre-compiled big-endian kernels aren't well known.
         // (see http://raspberrypi.stackexchange.com/questions/7279/big-endian-distribution-for-the-raspberry-pi)
-        match computer.mem.get32(addr, false) {
+        match computer.mem.get32(addr, computer.big_endian) {
             None => println!("[unitialized]"),
             Some(word) => {
+                // TODO: use Computer's instruction_at
                 match computer.cpu.decode_instruction(word) {
                     None => println!("[invalid or unrecognized instruction]: {:032b}", word),
                     Some(instr) => println!("{:?}", instr),

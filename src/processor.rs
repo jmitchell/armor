@@ -15,7 +15,7 @@ impl Processor {
         Processor { register_file: Default::default() }
     }
 
-    pub fn decode_instruction(&mut self, data: u32) -> Option<Instruction> {
+    pub fn decode_instruction(&self, data: u32) -> Option<Instruction> {
         Instruction::decode(data)
     }
 }
@@ -38,7 +38,7 @@ trait Encodable where Self : Sized {
 
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-enum Condition {
+pub enum Condition {
     EQ,
     NE,
     CS_HS,
@@ -139,7 +139,7 @@ impl Encodable for RegisterBank {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Mnemonic {
     ADC,
     ADD,
@@ -201,13 +201,13 @@ pub enum Mnemonic {
     UMULL,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum ShiftSize {
     Imm(u32),
     Reg(RegisterBank),
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum BarrelShiftOp {
     // TODO: Are Imm and Reg needed here? They're included in Table
     // 3.3, but not in Table B.4.
@@ -276,8 +276,8 @@ impl BarrelShiftOp {
     }
 }
 
-#[derive(PartialEq, Eq, Debug)]
-enum InstructionTemplate {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum InstructionTemplate {
     // Comparisons: CMN, CMP, TEQ, TST
     // NB: comparisons implicitly set the condition flags
     Cond_Rd_N {
@@ -332,7 +332,8 @@ enum InstructionTemplate {
     // B, BL
     Cond_Offset {
         cond: Condition,
-        offset: u32,
+        offset: u32,            // TODO: make signed (check whether
+            // it's 2's comp and do proper sign extension)
     },
 
     // BX
@@ -349,10 +350,10 @@ enum InstructionTemplate {
     }, // TODO: Continue from ASDG:3.3
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Instruction {
-    mnemonic: Mnemonic,
-    args: InstructionTemplate,
+    pub mnemonic: Mnemonic,
+    pub args: InstructionTemplate,
 }
 
 impl Instruction {
@@ -387,19 +388,27 @@ impl Instruction {
                                 if bits(21, 21) == 0 {
                                     println!("TODO: ORR, BIC")
                                 } else {
-                                    // TODO: BarrelShiftOp from shift, shift_size, and Rm
-
-                                    // mnemonic = Some(if code & (1 << 22) == 0 {
-                                    //     Mnemonic::MOV
-                                    // } else {
-                                    //     Mnemonic::MVN
-                                    // });
-                                    // template = Some(InstructionTemplate::Cond_S_Rd_N {
-                                    //     cond: cond,
-                                    //     s_flag: code & (1 << 20) == 1,
-                                    //     rd: decode_register((code >> 12) & 0b1111).unwrap(),
-                                    //     n: ,
-                                    // });
+                                    let rotate = bits(11, 8); // TODO: use this...somewhere?
+                                    mnemonic = Some(if bits(22, 22) == 0 {
+                                        Mnemonic::MOV
+                                    } else {
+                                        Mnemonic::MVN
+                                    });
+                                    let rd = RegisterBank::decode(bits(15, 12)).unwrap();
+                                    template = Some(InstructionTemplate::Cond_S_Rd_N {
+                                        cond: cond,
+                                        s_flag: bits(20, 20) == 1,
+                                        // TODO: eliminate rd
+                                        // redundancy. Decide whether
+                                        // to remove it from
+                                        // BarrelShiftOp or
+                                        // InstructionTemplate. Aim
+                                        // for consistent coordination
+                                        // between the two to avoid
+                                        // incorrect processing.
+                                        rd: rd,
+                                        n: BarrelShiftOp::ROR(rd, ShiftSize::Imm(bits(7, 0))),
+                                    });
                                 }
                             } else {
                                 println!("TODO");
