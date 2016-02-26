@@ -408,17 +408,17 @@ mod test {
         assert!(address_space
                 .leased_subregion_at(0xffffffffffffffff).is_none());
 
-        let mut orig_val: Cell = 0;
-        let mut new_val: Cell = 0;
+        let mut _orig_val: Cell = 0;
+        let mut _new_val: Cell = 0;
         let addr: Address = 50;
         {
             let mut inner_cell = address_space.get_mut(addr).unwrap();
-            orig_val = *inner_cell;
+            _orig_val = *inner_cell;
             *inner_cell += 1;
-            assert!(*inner_cell != orig_val);
+            assert!(*inner_cell != _orig_val);
         }
-        new_val = *address_space.get(addr).unwrap();
-        assert!(new_val != orig_val);
+        _new_val = *address_space.get(addr).unwrap();
+        assert!(_new_val != _orig_val);
     }
 
     #[test]

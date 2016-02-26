@@ -1,10 +1,13 @@
-#![allow(dead_code)]
+// TODO: Ideally, don't expose any non-camel case types in the public
+// interface.
+#![allow(non_camel_case_types)]
+#![allow(dead_code)]            // TODO: remove
 
 use registers::{
     RegisterBank,
     RegisterFile,
 };
-use std::fmt;
+
 
 pub struct Processor {
     pub register_file: RegisterFile,
@@ -30,6 +33,14 @@ impl Default for Processor {
     }
 }
 
+
+trait Decodable where Self : Sized {
+    fn decode(code: u32) -> Option<Self>;
+}
+
+trait Encodable where Self : Sized {
+    fn encode(val: Self) -> u32;
+}
 
 
 
@@ -70,22 +81,26 @@ const CONDITION_TABLE: [Condition; 15] = [
     Condition::AL,
 ];
 
-fn decode_condition(code: u32) -> Option<Condition> {
-    let index = code as usize;
-    if index < CONDITION_TABLE.len() {
-        Some(CONDITION_TABLE[index as usize].clone())
-    } else {
-        None
+impl Decodable for Condition {
+    fn decode(code: u32) -> Option<Condition> {
+        let index = code as usize;
+        if index < CONDITION_TABLE.len() {
+            Some(CONDITION_TABLE[index as usize].clone())
+        } else {
+            None
+        }
     }
 }
 
-fn encode_condition(cond: Condition) -> u32 {
-    for i in 0..CONDITION_TABLE.len() {
-        if CONDITION_TABLE[i] == cond {
-            return i as u32
+impl Encodable for Condition {
+    fn encode(cond: Condition) -> u32 {
+        for i in 0..CONDITION_TABLE.len() {
+            if CONDITION_TABLE[i] == cond {
+                return i as u32
+            }
         }
+        unreachable!()
     }
-    unreachable!()
 }
 
 
@@ -108,22 +123,26 @@ const REGISTER_BANK_TABLE: [RegisterBank; 16] = [
     RegisterBank::R15,
 ];
 
-fn decode_register(code: u32) -> Option<RegisterBank> {
-    let index = code as usize;
-    if index < REGISTER_BANK_TABLE.len() {
-        Some(REGISTER_BANK_TABLE[index as usize].clone())
-    } else {
-        None
+impl Decodable for RegisterBank {
+    fn decode(code: u32) -> Option<RegisterBank> {
+        let index = code as usize;
+        if index < REGISTER_BANK_TABLE.len() {
+            Some(REGISTER_BANK_TABLE[index as usize].clone())
+        } else {
+            None
+        }
     }
 }
 
-fn encode_register(register_bank: RegisterBank) -> u32 {
-    for i in 0..REGISTER_BANK_TABLE.len() {
-        if REGISTER_BANK_TABLE[i] == register_bank {
-            return i as u32
+impl Encodable for RegisterBank {
+    fn encode(register_bank: RegisterBank) -> u32 {
+        for i in 0..REGISTER_BANK_TABLE.len() {
+            if REGISTER_BANK_TABLE[i] == register_bank {
+                return i as u32
+            }
         }
+        unreachable!()
     }
-    unreachable!()
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -189,76 +208,79 @@ pub enum Mnemonic {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum Either<X, Y> {
-    Left(X),
-    Right(Y),
+pub enum ShiftSize {
+    Imm(u32),
+    Reg(RegisterBank),
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub enum BarrelShiftTemplate {
+pub enum BarrelShiftOp {
+    // TODO: Are Imm and Reg needed here? They're included in Table
+    // 3.3, but not in Table B.4.
     Imm(u32),
     Reg(RegisterBank),
-    LSL(RegisterBank, Either<u32, RegisterBank>),
-    LSR(RegisterBank, Either<u32, RegisterBank>),
-    ASR(RegisterBank, Either<u32, RegisterBank>),
-    ROR(RegisterBank, Either<u32, RegisterBank>),
+    LSL(RegisterBank, ShiftSize),
+    LSR(RegisterBank, ShiftSize),
+    ASR(RegisterBank, ShiftSize),
+    ROR(RegisterBank, ShiftSize),
     RRX(RegisterBank),
 }
 
-fn decode_shift(src_reg: RegisterBank, shift: u32, shift_size: u32, reg: Option<RegisterBank>) ->
-    Option<BarrelShiftTemplate>
-{
-    debug_assert!(shift_size <= 32 || reg.is_some());
-    match shift {
-        0b00 => {
-            match reg {
-                None => Some(BarrelShiftTemplate::LSL(src_reg, Either::Left(shift_size))),
-                Some(rs) => Some(BarrelShiftTemplate::LSL(src_reg, Either::Right(rs))),
-            }
-        },
-        0b01 => {
-            match reg {
-                None => {
-                    let n = if shift_size == 0 {
-                        32u32
-                    } else {
-                        shift_size
-                    };
-                    Some(BarrelShiftTemplate::LSR(src_reg, Either::Left(n)))
-                },
-                Some(rs) => Some(BarrelShiftTemplate::LSR(src_reg, Either::Right(rs))),
-            }
-        },
-        0b10 => {
-            match reg {
-                None => {
-                    let n = if shift_size == 0 {
-                        32u32
-                    } else {
-                        shift_size
-                    };
-                    Some(BarrelShiftTemplate::ASR(src_reg, Either::Left(n)))
-                },
-                Some(rs) => Some(BarrelShiftTemplate::ASR(src_reg, Either::Right(rs))),
-            }
-        },
-        0b11 => {
-            match reg {
-                None => {
-                    if shift_size == 0 {
-                        Some(BarrelShiftTemplate::RRX(src_reg))
-                    } else {
-                        Some(BarrelShiftTemplate::ROR(src_reg, Either::Left(shift_size)))
-                    }
-                },
-                Some(rs) => Some(BarrelShiftTemplate::ROR(src_reg, Either::Right(rs))),
-            }
-        },
-        _ => {
-            // 'The shift value is implicit: for PKHBT it is 00. For
-            // PKHTB it is 10. For SAT it is 2*sh.'
-            panic!("TODO: see last row in Table B.4");
-        },
+impl BarrelShiftOp {
+    fn decode(src_reg: RegisterBank, op_code: u32, shift_size: ShiftSize) ->
+        Option<BarrelShiftOp>
+    {
+        debug_assert!(match shift_size {
+            ShiftSize::Imm(n) => n <= 32,
+            ShiftSize::Reg(_) => true,
+        });
+
+        match op_code {
+            0b00 => Some(BarrelShiftOp::LSL(src_reg, shift_size)),
+            0b01 => {
+                match shift_size {
+                    ShiftSize::Imm(n) => {
+                        let amount = if n == 0 {
+                            32u32
+                        } else {
+                            n
+                        };
+                        Some(BarrelShiftOp::LSR(src_reg, ShiftSize::Imm(amount)))
+                    },
+                    ShiftSize::Reg(_) => Some(BarrelShiftOp::LSR(src_reg, shift_size)),
+                }
+            },
+            0b10 => {
+                match shift_size {
+                    ShiftSize::Imm(n) => {
+                        let amount = if n == 0 {
+                            32u32
+                        } else {
+                            n
+                        };
+                        Some(BarrelShiftOp::ASR(src_reg, ShiftSize::Imm(amount)))
+                    },
+                    ShiftSize::Reg(_) => Some(BarrelShiftOp::ASR(src_reg, shift_size)),
+                }
+            },
+            0b11 => {
+                match shift_size {
+                    ShiftSize::Imm(n) => {
+                        if n == 0 {
+                            Some(BarrelShiftOp::RRX(src_reg))
+                        } else {
+                            Some(BarrelShiftOp::ROR(src_reg, ShiftSize::Imm(n)))
+                        }
+                    },
+                    ShiftSize::Reg(_) => Some(BarrelShiftOp::ROR(src_reg, shift_size)),
+                }
+            },
+            _ => {
+                // 'The shift value is implicit: for PKHBT it is 00. For
+                // PKHTB it is 10. For SAT it is 2*sh.'
+                panic!("TODO: see last row in Table B.4");
+            },
+        }
     }
 }
 
@@ -269,7 +291,7 @@ enum InstructionTemplate {
     Cond_Rd_N {
         cond: Condition,
         rd: RegisterBank,
-        n: BarrelShiftTemplate,
+        n: BarrelShiftOp,
     },
 
     // MOV, MVN, ...
@@ -277,7 +299,7 @@ enum InstructionTemplate {
         cond: Condition,
         s_flag: bool,
         rd: RegisterBank,
-        n: BarrelShiftTemplate,
+        n: BarrelShiftOp,
     },
 
     // ADC, ADD, RSB, RSC, SBC, SUB, AND, ORR, EOR, BIC, ...
@@ -286,7 +308,7 @@ enum InstructionTemplate {
         s_flag: bool,
         rd: RegisterBank,
         rn: RegisterBank,
-        n: BarrelShiftTemplate,
+        n: BarrelShiftOp,
     },
 
     // MUL
@@ -358,7 +380,7 @@ impl Instruction {
         let mut mnemonic: Option<Mnemonic> = None;
         let mut template: Option<InstructionTemplate> = None;
 
-        match decode_condition(code >> 28) {
+        match Condition::decode(code >> 28) {
             Some(cond) => {
                 match (code >> 24) & 0b1111 {
                     0b0001 => {
@@ -370,7 +392,7 @@ impl Instruction {
                                 if code & (1 << 21) == 0 {
                                     println!("TODO: ORR, BIC")
                                 } else {
-                                    // TODO: BarrelShiftTemplate from shift, shift_size, and Rm
+                                    // TODO: BarrelShiftOp from shift, shift_size, and Rm
 
                                     // mnemonic = Some(if code & (1 << 22) == 0 {
                                     //     Mnemonic::MOV

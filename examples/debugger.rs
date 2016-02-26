@@ -1,13 +1,8 @@
 extern crate armor;
 
-use std::cmp;
 use std::io::prelude::*;
 use std::io;
 use armor::computer::Computer;
-use armor::address::{
-    Addressable,
-    Region,
-};
 use armor::registers::{
     ProgramStatusRegister,
     RegisterBank,
