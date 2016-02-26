@@ -3,26 +3,19 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code)]            // TODO: remove
 
-use registers::{
-    RegisterBank,
-    RegisterFile,
-};
+use registers::{RegisterBank, RegisterFile};
 
 
 pub struct Processor {
-    pub register_file: RegisterFile,
-    // TODO: add other parts as needed
+    pub register_file: RegisterFile, // TODO: add other parts as needed
 }
 
 impl Processor {
     pub fn new() -> Processor {
-        Processor {
-            register_file: Default::default(),
-        }
+        Processor { register_file: Default::default() }
     }
 
-    pub fn decode_instruction(&mut self, data: u32) -> Option<Instruction>
-    {
+    pub fn decode_instruction(&mut self, data: u32) -> Option<Instruction> {
         Instruction::decode(data)
     }
 }
@@ -63,6 +56,7 @@ enum Condition {
     AL,
 }
 
+#[cfg_attr(rustfmt, rustfmt_skip)]
 const CONDITION_TABLE: [Condition; 15] = [
     Condition::EQ,
     Condition::NE,
@@ -96,14 +90,14 @@ impl Encodable for Condition {
     fn encode(cond: Condition) -> u32 {
         for i in 0..CONDITION_TABLE.len() {
             if CONDITION_TABLE[i] == cond {
-                return i as u32
+                return i as u32;
             }
         }
         unreachable!()
     }
 }
 
-
+#[cfg_attr(rustfmt, rustfmt_skip)]
 const REGISTER_BANK_TABLE: [RegisterBank; 16] = [
     RegisterBank::R0,
     RegisterBank::R1,
@@ -138,7 +132,7 @@ impl Encodable for RegisterBank {
     fn encode(register_bank: RegisterBank) -> u32 {
         for i in 0..REGISTER_BANK_TABLE.len() {
             if REGISTER_BANK_TABLE[i] == register_bank {
-                return i as u32
+                return i as u32;
             }
         }
         unreachable!()
@@ -227,9 +221,7 @@ pub enum BarrelShiftOp {
 }
 
 impl BarrelShiftOp {
-    fn decode(src_reg: RegisterBank, op_code: u32, shift_size: ShiftSize) ->
-        Option<BarrelShiftOp>
-    {
+    fn decode(src_reg: RegisterBank, op_code: u32, shift_size: ShiftSize) -> Option<BarrelShiftOp> {
         debug_assert!(match shift_size {
             ShiftSize::Imm(n) => n <= 32,
             ShiftSize::Reg(_) => true,
@@ -246,10 +238,10 @@ impl BarrelShiftOp {
                             n
                         };
                         Some(BarrelShiftOp::LSR(src_reg, ShiftSize::Imm(amount)))
-                    },
+                    }
                     ShiftSize::Reg(_) => Some(BarrelShiftOp::LSR(src_reg, shift_size)),
                 }
-            },
+            }
             0b10 => {
                 match shift_size {
                     ShiftSize::Imm(n) => {
@@ -259,10 +251,10 @@ impl BarrelShiftOp {
                             n
                         };
                         Some(BarrelShiftOp::ASR(src_reg, ShiftSize::Imm(amount)))
-                    },
+                    }
                     ShiftSize::Reg(_) => Some(BarrelShiftOp::ASR(src_reg, shift_size)),
                 }
-            },
+            }
             0b11 => {
                 match shift_size {
                     ShiftSize::Imm(n) => {
@@ -271,15 +263,15 @@ impl BarrelShiftOp {
                         } else {
                             Some(BarrelShiftOp::ROR(src_reg, ShiftSize::Imm(n)))
                         }
-                    },
+                    }
                     ShiftSize::Reg(_) => Some(BarrelShiftOp::ROR(src_reg, shift_size)),
                 }
-            },
+            }
             _ => {
                 // 'The shift value is implicit: for PKHBT it is 00. For
                 // PKHTB it is 10. For SAT it is 2*sh.'
                 panic!("TODO: see last row in Table B.4");
-            },
+            }
         }
     }
 }
@@ -354,9 +346,7 @@ enum InstructionTemplate {
         cond: Condition,
         a: bool,
         offset: u32,
-    },
-
-    // TODO: Continue from ASDG:3.3
+    }, // TODO: Continue from ASDG:3.3
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -375,7 +365,6 @@ impl Instruction {
 }
 
 impl Instruction {
-
     fn decode(code: u32) -> Option<Instruction> {
         let mut mnemonic: Option<Mnemonic> = None;
         let mut template: Option<InstructionTemplate> = None;
@@ -410,36 +399,37 @@ impl Instruction {
                                 println!("TODO");
                             }
                         }
-                    },
+                    }
                     0b0100 => {
                         println!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
-                    },
+                    }
                     0b0101 => {
                         println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, W, and Imm12");
-                    },
+                    }
                     0b0110 => {
-                        println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and shift op");
-                    },
+                        println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and \
+                                  shift op");
+                    }
                     0b1010 => {
                         mnemonic = Some(Mnemonic::B);
                         template = Some(InstructionTemplate::Cond_Offset {
                             cond: cond,
                             offset: code & ((1 << 25) - 1),
                         });
-                    },
+                    }
                     0b1011 => {
                         mnemonic = Some(Mnemonic::BL);
                         template = Some(InstructionTemplate::Cond_Offset {
                             cond: cond,
                             offset: code & ((1 << 25) - 1),
                         });
-                    },
+                    }
                     x => println!("Unrecognized bits [27:24]: {:04b}", x),
                 }
-            },
+            }
             None => {
                 println!("TODO: decode unconditional instructions");
-            },
+            }
         }
 
         if let (Some(mnem), Some(args)) = (mnemonic, template) {
@@ -452,22 +442,16 @@ impl Instruction {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        Condition,
-        Instruction,
-        InstructionTemplate,
-        Mnemonic,
-    };
+    use super::{Condition, Instruction, InstructionTemplate, Mnemonic};
 
     #[test]
     fn decode_branch_instruction() {
         let code: u32 = 0b1110_1010_111111111111111111111111;
         assert_eq!(Instruction::decode(code).unwrap(),
-                   Instruction::new(
-                       Mnemonic::B,
-                       InstructionTemplate::Cond_Offset {
-                           cond: Condition::AL,
-                           offset: 0b111111111111111111111111,
-                       }));
+                   Instruction::new(Mnemonic::B,
+                                    InstructionTemplate::Cond_Offset {
+                                        cond: Condition::AL,
+                                        offset: 0b111111111111111111111111,
+                                    }));
     }
 }

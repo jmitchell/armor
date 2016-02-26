@@ -68,21 +68,41 @@ impl fmt::Debug for Register32 {
 
 #[derive(PartialEq, Eq, Hash, Debug)]
 pub enum ProcessorMode {
-    Abort,                      // failed attempt to access memory
-    FastInterruptRequest,       // fast interrupt system
-    InterruptRequest,           // interrupt system
-    Supervisor,                 // after reset
-    System,                     // User, except with RW access to CPSR
-    Undefined,                  // undefined or unsupported instruction
-    User,                       // used for programs and applications
+    /// failed attempt to access memory
+    Abort,
+
+    /// fast interrupt system
+    FastInterruptRequest,
+
+    /// interrupt system
+    InterruptRequest,
+
+    /// after reset
+    Supervisor,
+
+    /// User, except with RW access to CPSR
+    System,
+
+    /// undefined or unsupported instruction
+    Undefined,
+
+    /// used for programs and applications
+    User,
 }
 
 pub enum ConditionFlag {
-    Negative,                   // N
-    Zero,                       // Z
-    Carry,                      // C
-    Overflow,                   // V
-    // Saturation,                 // Q
+    /// N
+    Negative,
+
+    /// Z
+    Zero,
+
+    /// C
+    Carry,
+
+    /// V
+    Overflow, /* Q
+               * Saturation, */
 }
 
 pub enum InterruptMask {
@@ -91,9 +111,12 @@ pub enum InterruptMask {
 }
 
 pub enum InstructionSet {
+    /// Conventional ARM instruction set
     ARM,
-    Thumb,
-    // Jazelle,                    // Java-optimized IS
+
+    /// Reduced 16-bit instruction set
+    Thumb, /* Java-optimized IS
+            * Jazelle, */
 }
 
 pub trait ProgramStatusRegister : Register {
@@ -110,14 +133,11 @@ pub trait ProgramStatusRegister : Register {
     fn is_condition_flag(&self, u8) -> bool;
 
     fn permit_read(&self, i: u8) -> bool {
-        self.is_privileged_mode() ||
-            self.is_control_field(i) ||
-            self.is_condition_flag(i)
+        self.is_privileged_mode() || self.is_control_field(i) || self.is_condition_flag(i)
     }
 
     fn permit_write(&self, i: u8) -> bool {
-        self.is_privileged_mode() ||
-            self.is_condition_flag(i)
+        self.is_privileged_mode() || self.is_condition_flag(i)
     }
 
     fn condition_flag_index(&self, ConditionFlag) -> u8;
@@ -181,7 +201,7 @@ impl ProgramStatusRegister for Register32 {
             0x17 => Some(ProcessorMode::Abort),
             0x1b => Some(ProcessorMode::Undefined),
             0x1f => Some(ProcessorMode::System),
-            _ => None
+            _ => None,
         }
     }
 
@@ -237,11 +257,24 @@ impl ProgramStatusRegister for Register32 {
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum RegisterBank {
-    R0, R1, R2, R3,
-    R4, R5, R6, R7,
-    R8, R9, R10, R11,
-    R12, R13, R14, R15,
-    CPSR, SPSR,
+    R0,
+    R1,
+    R2,
+    R3,
+    R4,
+    R5,
+    R6,
+    R7,
+    R8,
+    R9,
+    R10,
+    R11,
+    R12,
+    R13,
+    R14,
+    R15,
+    CPSR,
+    SPSR,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug)]
@@ -329,9 +362,7 @@ impl RegisterFile {
     }
 
     // TODO: DRY up lookup_mut and lookup
-    pub fn lookup_mut(&mut self, bank: RegisterBank) ->
-        Option<&mut Register32>
-    {
+    pub fn lookup_mut(&mut self, bank: RegisterBank) -> Option<&mut Register32> {
         if self.register_exists(bank) {
             let mode = self.mode();
             self.table.get_mut(&RegisterID(bank, mode))
@@ -398,6 +429,6 @@ mod test {
 
     #[test]
     fn it_works() {
-        assert_eq!(2,2);
+        assert_eq!(2, 2);
     }
 }
