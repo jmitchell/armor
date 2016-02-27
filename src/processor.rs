@@ -416,14 +416,14 @@ impl Instruction {
                         }
                     }
                     0b0100 => {
-                        println!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
+                        // println!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
                     }
                     0b0101 => {
-                        println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, W, and Imm12");
+                        // println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, W, and Imm12");
                     }
                     0b0110 => {
-                        println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and \
-                                  shift op");
+                        // println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and \
+                        //           shift op");
                     }
                     0b1010 => {
                         mnemonic = Some(Mnemonic::B);

@@ -29,9 +29,9 @@ impl Computer {
     pub fn execute_next_instruction(&mut self) {
         let pc_addr = self.cpu.register_file
             .lookup(registers::RegisterBank::R15).unwrap().bits;
-        match self.instruction_at(&pc_addr) {
-            None => panic!(""),
-            Some(instr) => if self.condition_satisfied(&instr) {
+        match self.instruction_at(pc_addr as address::Address) {
+            Err(s) => panic!(s),
+            Ok(instr) => if self.condition_satisfied(&instr) {
                 match instr.mnemonic {
                     processor::Mnemonic::B => {
                         match self.cpu.register_file.lookup_mut(registers::RegisterBank::R15) {
@@ -54,12 +54,15 @@ impl Computer {
 
     }
 
-    pub fn instruction_at(&self, addr: &u32) -> Option<processor::Instruction> {
-        debug_assert!(*addr % 4 == 0);
-        debug_assert!(*addr <= self.mem.address_space.end() as u32);
-        match self.mem.get32(*addr as address::Address, self.big_endian) {
-            None => None,
-            Some(word) => self.cpu.decode_instruction(word),
+    pub fn instruction_at(&self, addr: address::Address) -> Result<processor::Instruction, String> {
+        debug_assert!(addr % 4 == 0);
+        debug_assert!(addr <= self.mem.address_space.end());
+        match self.mem.get32(addr, self.big_endian) {
+            None => Err("[ uninitialized memory ]".to_owned()),
+            Some(word) => match self.cpu.decode_instruction(word) {
+                None => Err(format!("[ ??? '{:#032b}' ]", word)),
+                Some(instr) => Ok(instr),
+            },
         }
     }
 

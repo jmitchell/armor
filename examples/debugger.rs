@@ -2,6 +2,7 @@ extern crate armor;
 
 use std::io::prelude::*;
 use std::io;
+use armor::address;
 use armor::computer::Computer;
 use armor::registers::{
     ProgramStatusRegister,
@@ -134,20 +135,21 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
     let instrs_before_and_after = 5;
     let amount = instrs_before_and_after * 4;
     let low = if pc_addr < amount {
-        0u64
+        0 as address::Address
     } else {
-        (pc_addr - amount) as u64
+        (pc_addr - amount) as address::Address
     };
     let high = if pc_addr > (u32::max_value() - amount) {
-        u32::max_value() as u64
+        u32::max_value() as address::Address
     } else {
-        (pc_addr + amount) as u64
+        (pc_addr + amount) as address::Address
     };
 
     // let ref mem = computer.mem.address_space;
     let mut addr = low;
+    println!("");
     while addr <= high {
-        if addr == pc_addr as u64 {
+        if addr == pc_addr as address::Address {
             print!("\t>");
         } else {
             print!("\t ");
@@ -159,19 +161,13 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
         // There are claims that RPI2 is little endian by default, and
         // pre-compiled big-endian kernels aren't well known.
         // (see http://raspberrypi.stackexchange.com/questions/7279/big-endian-distribution-for-the-raspberry-pi)
-        match computer.mem.get32(addr, computer.big_endian) {
-            None => println!("[unitialized]"),
-            Some(word) => {
-                // TODO: use Computer's instruction_at
-                match computer.cpu.decode_instruction(word) {
-                    None => println!("[invalid or unrecognized instruction]: {:032b}", word),
-                    Some(instr) => println!("{:?}", instr),
-                }
-            },
+
+        match computer.instruction_at(addr) {
+            Err(s) => println!("{}", s),
+            Ok(instr) => println!("{:?}", instr),
         }
         addr += 4;
     }
-    println!("PC Address: 0x{:08x}", pc_addr);
 }
 
 
