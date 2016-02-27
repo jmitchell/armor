@@ -1,5 +1,7 @@
 extern crate armor;
 
+use std::env;
+use std::fs::File;
 use std::io::prelude::*;
 use std::io;
 use armor::address;
@@ -145,7 +147,6 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
         (pc_addr + amount) as address::Address
     };
 
-    // let ref mem = computer.mem.address_space;
     let mut addr = low;
     println!("");
     while addr <= high {
@@ -155,12 +156,6 @@ fn handle_print_code(_args: &[&str], computer: &mut Computer) {
             print!("\t ");
         }
         print!(" 0x{:08x}: ", addr);
-        // TODO: Is the u-boot.bin code really little endian, or is
-        // there a problem with how the bits are printed?
-        //
-        // There are claims that RPI2 is little endian by default, and
-        // pre-compiled big-endian kernels aren't well known.
-        // (see http://raspberrypi.stackexchange.com/questions/7279/big-endian-distribution-for-the-raspberry-pi)
 
         match computer.instruction_at(addr) {
             Err(s) => println!("{}", s),
@@ -209,28 +204,31 @@ Type 'help' to see supported commands.
     return Ok(())
 }
 
+fn load_boot_code(path: String) -> Result<Vec<u8>, io::Error> {
+    let mut f = try!(File::open(path));
+    let mut buf = vec![];
+    try!(f.read_to_end(&mut buf));
+    Ok(buf)
+}
+
 fn main() {
     println!("
 ARMOR Debugging Interface
 =========================
 ");
 
-    // First several instructions from a u-boot binary compiled on a
-    // Raspberry Pi 2.
-    let boot_code = vec![
-        // Vector table starting at 0x00000000.
-        0xbe, 0x00, 0x00, 0xea, // Reset (supervisor)
-        0x14, 0xf0, 0x9f, 0xe5, // Undefined instruction (undefined)
-        0x14, 0xf0, 0x9f, 0xe5, // Software interrupt (supervisor)
-        0x14, 0xf0, 0x9f, 0xe5, // Abort - prefetch (abort)
-        0x14, 0xf0, 0x9f, 0xe5, // Abort - data (abort)
-        0x14, 0xf0, 0x9f, 0xe5, // Reserved (reserved)
-        0x14, 0xf0, 0x9f, 0xe5, // IRQ
-        0x14, 0xf0, 0x9f, 0xe5, // FIQ
-        // End of vector table
-        0x60, 0x80, 0x00, 0x00,
-        0xc0, 0x80, 0x00, 0x00,
-    ];
-    let computer = &mut Computer::new(boot_code);
-    debugger_repl(computer).is_ok();
+    if let Some(boot_bin_file) = env::args().nth(1) {
+        // TODO: endianness
+        println!("Loading boot file: {}", boot_bin_file);
+        match load_boot_code(boot_bin_file) {
+            Ok(boot_code) => {
+                // TODO: deal with ROM size limit
+                let computer = &mut Computer::new(boot_code[..65535].to_vec());
+                debugger_repl(computer).is_ok();
+            },
+            Err(_) => panic!("Unexpected error while loading boot code file"),
+        }
+    } else {
+        panic!("missing argument: path to boot binary file");
+    }
 }

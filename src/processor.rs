@@ -332,8 +332,7 @@ pub enum InstructionTemplate {
     // B, BL
     Cond_Offset {
         cond: Condition,
-        offset: u32,            // TODO: make signed (check whether
-            // it's 2's comp and do proper sign extension)
+        offset: u32,
     },
 
     // BX
@@ -347,7 +346,20 @@ pub enum InstructionTemplate {
         cond: Condition,
         a: bool,
         offset: u32,
-    }, // TODO: Continue from ASDG:3.3
+    },
+
+    // TODO: Continue from ASDG:3.3
+
+
+
+
+    // MRS
+    Cond_Rd_PSR {
+        cond: Condition,
+        rd: RegisterBank,       // TODO: can't be PC
+        psr: RegisterBank,     // TODO: Must be CPSR or SPSR
+    }
+
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -366,13 +378,25 @@ impl Instruction {
 }
 
 impl Instruction {
+    /// Decode a 32-bit instruction with no other context.
+    ///
+    /// The precise meaning of some bit fields depend on the state of
+    /// the machine. However, this decoding process is merely for
+    /// initial bit field extraction.
+    ///
+    /// For example, the `B` branch instruction encodes a relative
+    /// offset address. Intrepreting this offset field requires
+    /// inspecting the PC register and treating the bits as a 24-bit
+    /// twos complement signed integer. To keep the instruction
+    /// decoder modular, this relative offset isn't interpretted until
+    /// execution-time.
     fn decode(code: u32) -> Option<Instruction> {
         let mut mnemonic: Option<Mnemonic> = None;
         let mut template: Option<InstructionTemplate> = None;
 
         let bits = |hi: u16, lo: u16| -> u32 {
             debug_assert!(lo <= hi && hi < 32);
-            let mask = (1 << (hi - lo + 2)) - 1;
+            let mask = (1 << (hi - lo + 1)) - 1;
             (code >> lo) & mask
         };
 
@@ -380,9 +404,19 @@ impl Instruction {
             Some(cond) => {
                 match bits(27, 24) {
                     0b0001 => {
-                        // Cond_S_Rd_N
                         if bits(23, 23) == 0 {
-                            println!("TODO");
+                            if bits(21, 16) == 0b001111 && bits(11, 0) == 0 {
+                                mnemonic = Some(Mnemonic::MRS);
+                                template = Some(InstructionTemplate::Cond_Rd_PSR {
+                                    cond: cond,
+                                    rd: RegisterBank::decode(bits(15, 12)).unwrap(),
+                                    psr: if bits(22, 22) == 0 {
+                                        RegisterBank::CPSR
+                                    } else {
+                                        RegisterBank::SPSR
+                                    },
+                                })
+                            }
                         } else {
                             if bits(4, 4) == 0 {
                                 if bits(21, 21) == 0 {
@@ -458,15 +492,26 @@ impl Instruction {
 #[cfg(test)]
 mod test {
     use super::{Condition, Instruction, InstructionTemplate, Mnemonic};
+    use registers::RegisterBank;
 
     #[test]
     fn decode_branch_instruction() {
-        let code: u32 = 0b1110_1010_111111111111111111111111;
-        assert_eq!(Instruction::decode(code).unwrap(),
-                   Instruction::new(Mnemonic::B,
-                                    InstructionTemplate::Cond_Offset {
-                                        cond: Condition::AL,
-                                        offset: 0b111111111111111111111111,
-                                    }));
+        assert_eq!(
+            Instruction::decode(0b1110_1010_000000000000000010111110).unwrap(),
+            Instruction::new(Mnemonic::B,
+                             InstructionTemplate::Cond_Offset {
+                                 cond: Condition::AL,
+                                 offset: 190,
+                             }));
+
+        assert_eq!(
+            Instruction::decode(0b1110_0001_000011110000000000000000).unwrap(),
+            Instruction::new(Mnemonic::MRS,
+                             InstructionTemplate::Cond_Rd_PSR {
+                                 cond: Condition::AL,
+                                 rd: RegisterBank::R0,
+                                 psr: RegisterBank::CPSR,
+                             }));
     }
+
 }

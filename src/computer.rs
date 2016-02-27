@@ -40,9 +40,20 @@ impl Computer {
                                 cond: _,
                                 offset: offset,
                             } = instr.args {
-                                *pc = registers::Register32 {
-                                    bits: pc.bits + 8 + (offset << 2),
+                                // interpret `offset` as a signed
+                                // 24-bit twos complement integer
+                                let signed_offset = {
+                                    if offset & (1 << 23) == 0 {
+                                        offset as i32
+                                    } else {
+                                        let hi_mask: u32 = 0b11111111 << 24;
+                                        let n: i32 = (offset | hi_mask) as i32;
+                                        debug_assert!(n < 0);
+                                        n
+                                    }
                                 };
+                                // TODO: address underflow/overflow
+                                pc.bits = (pc.bits as i32 + 8 + (signed_offset << 2)) as u32;
                             }
 
                         }
@@ -61,7 +72,10 @@ impl Computer {
             None => Err("[ uninitialized memory ]".to_owned()),
             Some(word) => match self.cpu.decode_instruction(word) {
                 None => Err(format!("[ ??? '{:#032b}' ]", word)),
-                Some(instr) => Ok(instr),
+                Some(instr) => {
+                    print!("[ '{:#032b}' ] ", word);
+                    Ok(instr)
+                },
             },
         }
     }
