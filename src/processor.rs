@@ -284,7 +284,6 @@ impl Instruction {
                 Some(CondInstr::B(rel_offset))
             },
             x => {
-                println!("TODO: decode conditional with bits [27:24] of {:04b}", x);
                 None
             }
         }

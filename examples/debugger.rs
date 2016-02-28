@@ -70,6 +70,11 @@ const COMMANDS: &'static [Command] = &[
         &handle_step,
         &[]),
     Command(
+        "run",
+        "Continually execute instructions",
+        &handle_run,
+        &[]),
+    Command(
         "help",
         "Display documentation for supported commands",
         &handle_help,
@@ -116,6 +121,21 @@ Top-level commands
 
 fn handle_step(_args: &[&str], computer: &mut Computer) {
     computer.execute_next_instruction();
+}
+
+fn handle_run(_args: &[&str], computer: &mut Computer) {
+    println!("");
+    loop {
+        // TODO: refactor code copied from handle_print_code.
+        let pc_addr = computer.cpu.register_file.lookup(RegisterBank::R15).unwrap().bits;
+        assert!(pc_addr % 4 == 0);
+        print!("\t0x{:08x}: ", pc_addr);
+        match computer.instruction_at(pc_addr as u64) {
+            Err(s) => println!("{}", s),
+            Ok(instr) => println!("{:?}", instr),
+        }
+        computer.execute_next_instruction();
+    }
 }
 
 fn handle_print(_args: &[&str], _computer: &mut Computer) {

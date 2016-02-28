@@ -45,10 +45,7 @@ impl Computer {
             None => Err("[ uninitialized memory ]".to_owned()),
             Some(word) => match self.cpu.decode_instruction(word) {
                 None => Err(format!("[ ??? '{:#032b}' ]", word)),
-                Some(instr) => {
-                    print!("[ '{:#032b}' ] ", word);
-                    Ok(instr)
-                },
+                Some(instr) => Ok(instr),
             },
         }
     }
@@ -69,6 +66,7 @@ impl Computer {
                 },
             Instruction::Uncond(instr) => (),
         }
+        self.program_counter().bits += 4;
     }
 
     fn condition_satisfied(&self, cond: Condition) -> bool {
@@ -80,6 +78,9 @@ impl Computer {
             CondInstr::B(rel_offset) => {
                 let mut pc = self.program_counter();
                 pc.bits = ((pc.bits as i32) + rel_offset) as u32;
+
+                // hack to invert effect of PC increment behavior
+                pc.bits -= 4;
             },
             CondInstr::MRS { rd: dest, psr: src } => {
                 self.copy_register(dest, src);
