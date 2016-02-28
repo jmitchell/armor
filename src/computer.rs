@@ -46,7 +46,7 @@ impl Computer {
         match self.mem.get32(addr, self.big_endian) {
             None => Err("[ uninitialized memory ]".to_owned()),
             Some(word) => match self.cpu.decode_instruction(word) {
-                None => Err(format!("[ ??? '{:#032b}' ]", word)),
+                None => Err(format!("[ ??? '0b{:0>32b}' ]", word)),
                 Some(instr) => Ok(instr),
             },
         }
