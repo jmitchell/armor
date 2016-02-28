@@ -53,8 +53,12 @@ impl Computer {
         }
     }
 
+    fn register(&mut self, reg_bank: RegisterBank) -> Option<&mut Register32> {
+        self.cpu.register_file.lookup_mut(reg_bank)
+    }
+
     fn program_counter(&mut self) -> &mut Register32 {
-        self.cpu.register_file.lookup_mut(RegisterBank::R15).unwrap()
+        self.register(RegisterBank::R15).unwrap()
     }
 
     fn execute(&mut self, instr: Instruction) {
@@ -77,7 +81,18 @@ impl Computer {
                 let mut pc = self.program_counter();
                 pc.bits = ((pc.bits as i32) + rel_offset) as u32;
             },
-            _ => panic!("Failed to execute instruction {:?}", *instr),
+            CondInstr::MRS { rd: dest, psr: src } => {
+                self.copy_register(dest, src);
+            },
         }
+    }
+
+    fn copy_register(&mut self, dest: RegisterBank, src: RegisterBank) {
+        let bits = {
+            let s = self.register(src).unwrap();
+            s.bits
+        };
+        let mut d = self.register(dest).unwrap();
+        d.bits = bits;
     }
 }

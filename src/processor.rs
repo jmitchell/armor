@@ -255,8 +255,10 @@ impl Instruction {
         match bits(code, 27, 24) {
             0b0001 => {
                 if bits(code, 21, 16) == 0b001111 && bits(code, 11, 0) == 0 {
+                    let rd = RegisterBank::decode(bits(code, 15, 12));
+                    debug_assert!(rd != RegisterBank::R15);
                     Some(CondInstr::MRS {
-                        rd: RegisterBank::decode(bits(code, 15, 12)),
+                        rd: rd,
                         psr: if bits(code, 22, 22) == 0 {
                             RegisterBank::CPSR
                         } else {
@@ -301,22 +303,25 @@ mod test {
     use registers::RegisterBank;
 
     #[test]
-    fn decode_branch_instruction() {
-        assert_eq!(
-            Instruction::decode(0b1110_1010_000000000000000010111110).unwrap(),
-            Instruction::Cond(
-                CondInstr::B(768),
-                Condition::AL));
+    fn decode_instructions() {
+        let decodings = vec![
+            (0b1110_1010_000000000000000010111110,
+             Instruction::Cond(
+                 CondInstr::B(768),
+                 Condition::AL)),
 
+            (0b1110_0001_000011110000000000000000,
+             Instruction::Cond(
+                 CondInstr::MRS {
+                     rd: RegisterBank::R0,
+                     psr: RegisterBank::CPSR,
+                 },
+                 Condition::AL)),
+        ];
 
-        // assert_eq!(
-        //     Instruction::decode(0b1110_0001_000011110000000000000000).unwrap(),
-        //     Instruction::new(Mnemonic::MRS,
-        //                      InstructionTemplate::Cond_Rd_PSR {
-        //                          cond: Condition::AL,
-        //                          rd: RegisterBank::R0,
-        //                          psr: RegisterBank::CPSR,
-        //                      }));
+        for (code, expected_instr) in decodings {
+            assert_eq!(Instruction::decode(code).unwrap(), expected_instr);
+        }
     }
 
 }
