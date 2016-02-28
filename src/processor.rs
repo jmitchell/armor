@@ -218,6 +218,8 @@ pub enum CondInstr {
 
     B(i32),
     MRS { rd: RegisterBank, psr: RegisterBank },
+    //MSR { psr: RegisterBank, f: bool, s: bool, x: bool, c: bool, rotate: u32, immed: u32 },
+    TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
     // TODO: Remove when done. Helps avert unreachable pattern errors
     // during development.
@@ -295,6 +297,30 @@ impl Instruction {
                     _ => None
                 }
             },
+            0b0011 => {
+                if bits(code, 23, 23) == 0 {
+                    if bits(code, 20, 20) == 0 {
+                        None
+                    } else {
+                        debug_assert!(bits(code, 15, 12) == 0);
+                        let rn = RegisterBank::decode(bits(code, 19, 16));
+                        let rotate = bits(code, 11, 8);
+                        let immed = bits(code, 7, 0);
+                        match bits(code, 22, 21) {
+                            0b01 => {
+                                Some(CondInstr::TEQ {
+                                    rn: rn,
+                                    rotate: rotate,
+                                    immed: immed
+                                })
+                            },
+                            _ => None,
+                        }
+                    }
+                } else {
+                    None
+                }
+            },
             0b1010 => {
                 let offset_bits = bits(code, 23, 0);
                 let signed_num = {
@@ -353,6 +379,14 @@ mod test {
                  },
                  Condition::AL)),
 
+            (0b1110_0011_0011_000100000_0000_0011010,
+             Instruction::Cond(
+                 CondInstr::TEQ {
+                     rn: RegisterBank::R1,
+                     rotate: 0,
+                     immed: 0b0011010,
+                 },
+                 Condition::AL)),
         ];
 
         for (code, expected_instr) in decodings {

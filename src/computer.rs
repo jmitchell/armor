@@ -10,6 +10,8 @@ use processor::{
     UncondInstr,
 };
 use registers::{
+    ConditionFlag,
+    ProgramStatusRegister,
     Register32,
     RegisterBank,
 };
@@ -100,6 +102,17 @@ impl Computer {
             },
             CondInstr::MRS { rd, psr } => {
                 self.copy_register(rd, psr);
+            },
+            CondInstr::TEQ { rn, rotate, immed } => {
+                let shift = Self::ror(immed, 2 * rotate);
+                let val = self.register(rn).unwrap().bits ^ shift;
+
+                let cpsr = self.register(RegisterBank::CPSR).unwrap();
+                // TODO: update C according to shifter carry
+                // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
+                cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0); // TODO: test
             },
             _ => panic!("Unhandled instruction {:?}", instr),
         }
