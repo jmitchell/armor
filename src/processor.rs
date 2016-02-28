@@ -213,8 +213,15 @@ impl BarrelShiftOp {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CondInstr {
+    // TODO: use BarrelShiftOp
+    AND { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
+
     B(i32),
     MRS { rd: RegisterBank, psr: RegisterBank },
+
+    // TODO: Remove when done. Helps avert unreachable pattern errors
+    // during development.
+    DUMMY,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -270,6 +277,24 @@ impl Instruction {
                     None
                 }
             },
+            0b0010 => {
+                let s = bits(code, 20, 20) == 1;
+                let rn = RegisterBank::decode(bits(code, 19, 16));
+                let rd = RegisterBank::decode(bits(code, 15, 12));
+                let rotate = bits(code, 11, 8);
+                let immed = bits(code, 7, 0);
+                match bits(code, 23, 21) {
+                    0b000 =>
+                        Some(CondInstr::AND {
+                            s: s,
+                            rd: rd,
+                            rn: rn,
+                            rotate: rotate,
+                            immed: immed,
+                        }),
+                    _ => None
+                }
+            },
             0b1010 => {
                 let offset_bits = bits(code, 23, 0);
                 let signed_num = {
@@ -316,6 +341,18 @@ mod test {
                      psr: RegisterBank::CPSR,
                  },
                  Condition::AL)),
+
+            (0b1110_0010_0000_0000_0001_0000_00011111,
+             Instruction::Cond(
+                 CondInstr::AND {
+                     s: false,
+                     rn: RegisterBank::R0,
+                     rd: RegisterBank::R1,
+                     rotate: 0,
+                     immed: 0b00011111,
+                 },
+                 Condition::AL)),
+
         ];
 
         for (code, expected_instr) in decodings {

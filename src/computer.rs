@@ -73,8 +73,24 @@ impl Computer {
         true                    // TODO: implement properly
     }
 
+    // TODO: delegate to the BarrelShiftOp
+    fn ror(x: u32, y: u32) -> u32 {
+        if y == 0 {
+            x
+        } else {
+            (x >> y) | (x << (32 - y))
+        }
+    }
+
     fn execute_conditional(&mut self, instr: &CondInstr) {
         match *instr {
+            CondInstr::AND { s, rd, rn, rotate, immed } => {
+                let bits = self.register(rn).unwrap().bits & Self::ror(immed, 2 * rotate);
+                self.register(rd).unwrap().bits = bits;
+                if s {
+                    // TODO: update CPSR's condition flags
+                }
+            },
             CondInstr::B(rel_offset) => {
                 let mut pc = self.program_counter();
                 pc.bits = ((pc.bits as i32) + rel_offset) as u32;
@@ -82,9 +98,10 @@ impl Computer {
                 // hack to invert effect of PC increment behavior
                 pc.bits -= 4;
             },
-            CondInstr::MRS { rd: dest, psr: src } => {
-                self.copy_register(dest, src);
+            CondInstr::MRS { rd, psr } => {
+                self.copy_register(rd, psr);
             },
+            _ => panic!("Unhandled instruction {:?}", instr),
         }
     }
 
