@@ -117,14 +117,11 @@ const REGISTER_BANK_TABLE: [RegisterBank; 16] = [
     RegisterBank::R15,
 ];
 
-impl Decodable for RegisterBank {
-    fn decode(code: u32) -> Option<RegisterBank> {
+impl RegisterBank {
+    fn decode(code: u32) -> RegisterBank {
         let index = code as usize;
-        if index < REGISTER_BANK_TABLE.len() {
-            Some(REGISTER_BANK_TABLE[index as usize].clone())
-        } else {
-            None
-        }
+        assert!(index < REGISTER_BANK_TABLE.len());
+        REGISTER_BANK_TABLE[index].clone()
     }
 }
 
@@ -137,68 +134,6 @@ impl Encodable for RegisterBank {
         }
         unreachable!()
     }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Mnemonic {
-    ADC,
-    ADD,
-    AND,
-    B,
-    BIC,
-    BKPT,
-    BL,
-    BLX,
-    BX,
-    CDP,
-    CDP2,
-    CLZ,
-    CMN,
-    CMP,
-    EOR,
-    LDC,
-    LDC2,
-    LDM,
-    LDR,
-    MCR,
-    MCR2,
-    MCRR,
-    MLA,
-    MOV,
-    MRC,
-    MRC2,
-    MRRC,
-    MRS,
-    MSR,
-    MUL,
-    MVN,
-    ORR,
-    PLD,
-    QADD,
-    QDADD,
-    QDSUB,
-    QSUB,
-    RSB,
-    RSC,
-    SBC,
-    SMLAxy,
-    SMLAL,
-    SMLALxy,
-    SMLAWy,
-    SMULL,
-    SMULxy,
-    SMULWy,
-    STC,
-    STC2,
-    STM,
-    STR,
-    SUB,
-    SWI,
-    SWP,
-    TEQ,
-    TST,
-    UMLAL,
-    UMULL,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -277,241 +212,111 @@ impl BarrelShiftOp {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum InstructionTemplate {
-    // Comparisons: CMN, CMP, TEQ, TST
-    // NB: comparisons implicitly set the condition flags
-    Cond_Rd_N {
-        cond: Condition,
-        rd: RegisterBank,
-        n: BarrelShiftOp,
-    },
-
-    // MOV, MVN, ...
-    Cond_S_Rd_N {
-        cond: Condition,
-        s_flag: bool,
-        rd: RegisterBank,
-        n: BarrelShiftOp,
-    },
-
-    // ADC, ADD, RSB, RSC, SBC, SUB, AND, ORR, EOR, BIC, ...
-    Cond_S_Rd_Rn_N {
-        cond: Condition,
-        s_flag: bool,
-        rd: RegisterBank,
-        rn: RegisterBank,
-        n: BarrelShiftOp,
-    },
-
-    // MUL
-    Cond_S_Rd_Rm_Rs {
-        cond: Condition,
-        rd: RegisterBank,
-        rm: RegisterBank,
-        rs: RegisterBank,
-    },
-
-    // MLA
-    Cond_S_Rd_Rm_Rs_Rn {
-        cond: Condition,
-        rd: RegisterBank,
-        rm: RegisterBank,
-        rs: RegisterBank,
-        rn: RegisterBank,
-    },
-
-    // SMLAL, SMULL, UMLAL, UMULL
-    Cond_S_RdLo_RdHi_Rm_Rs {
-        cond: Condition,
-        rd_lo: RegisterBank,
-        rd_hi: RegisterBank,
-        rm: RegisterBank,
-        rs: RegisterBank,
-    },
-
-    // B, BL
-    Cond_Offset {
-        cond: Condition,
-        offset: u32,
-    },
-
-    // BX
-    Cond_Rm {
-        cond: Condition,
-        rm: RegisterBank,
-    },
-
-    // BLX
-    Cond_A_Offset {
-        cond: Condition,
-        a: bool,
-        offset: u32,
-    },
-
-    // TODO: Continue from ASDG:3.3
-
-
-
-
-    // MRS
-    Cond_Rd_PSR {
-        cond: Condition,
-        rd: RegisterBank,       // TODO: can't be PC
-        psr: RegisterBank,     // TODO: Must be CPSR or SPSR
-    }
-
+pub enum CondInstr {
+    B(i32),
+    MRS { rd: RegisterBank, psr: RegisterBank },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Instruction {
-    pub mnemonic: Mnemonic,
-    pub args: InstructionTemplate,
+pub enum UncondInstr {
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum Instruction {
+    Cond(CondInstr, Condition),
+    Uncond(UncondInstr),
+}
+
+fn bits(n: u32, hi: u16, lo: u16) -> u32 {
+    debug_assert!(lo <= hi && hi < 32);
+    let mask = (1 << (hi - lo + 1)) - 1;
+    (n >> lo) & mask
 }
 
 impl Instruction {
-    fn new(mnemonic: Mnemonic, args: InstructionTemplate) -> Instruction {
-        Instruction {
-            mnemonic: mnemonic,
-            args: args,
-        }
-    }
-}
-
-impl Instruction {
-    /// Decode a 32-bit instruction with no other context.
-    ///
-    /// The precise meaning of some bit fields depend on the state of
-    /// the machine. However, this decoding process is merely for
-    /// initial bit field extraction.
-    ///
-    /// For example, the `B` branch instruction encodes a relative
-    /// offset address. Intrepreting this offset field requires
-    /// inspecting the PC register and treating the bits as a 24-bit
-    /// twos complement signed integer. To keep the instruction
-    /// decoder modular, this relative offset isn't interpretted until
-    /// execution-time.
     fn decode(code: u32) -> Option<Instruction> {
-        let mut mnemonic: Option<Mnemonic> = None;
-        let mut template: Option<InstructionTemplate> = None;
-
-        let bits = |hi: u16, lo: u16| -> u32 {
-            debug_assert!(lo <= hi && hi < 32);
-            let mask = (1 << (hi - lo + 1)) - 1;
-            (code >> lo) & mask
-        };
-
-        match Condition::decode(bits(31, 28)) {
-            Some(cond) => {
-                match bits(27, 24) {
-                    0b0001 => {
-                        if bits(23, 23) == 0 {
-                            if bits(21, 16) == 0b001111 && bits(11, 0) == 0 {
-                                mnemonic = Some(Mnemonic::MRS);
-                                template = Some(InstructionTemplate::Cond_Rd_PSR {
-                                    cond: cond,
-                                    rd: RegisterBank::decode(bits(15, 12)).unwrap(),
-                                    psr: if bits(22, 22) == 0 {
-                                        RegisterBank::CPSR
-                                    } else {
-                                        RegisterBank::SPSR
-                                    },
-                                })
-                            }
-                        } else {
-                            if bits(4, 4) == 0 {
-                                if bits(21, 21) == 0 {
-                                    println!("TODO: ORR, BIC")
-                                } else {
-                                    let rotate = bits(11, 8); // TODO: use this...somewhere?
-                                    mnemonic = Some(if bits(22, 22) == 0 {
-                                        Mnemonic::MOV
-                                    } else {
-                                        Mnemonic::MVN
-                                    });
-                                    let rd = RegisterBank::decode(bits(15, 12)).unwrap();
-                                    template = Some(InstructionTemplate::Cond_S_Rd_N {
-                                        cond: cond,
-                                        s_flag: bits(20, 20) == 1,
-                                        // TODO: eliminate rd
-                                        // redundancy. Decide whether
-                                        // to remove it from
-                                        // BarrelShiftOp or
-                                        // InstructionTemplate. Aim
-                                        // for consistent coordination
-                                        // between the two to avoid
-                                        // incorrect processing.
-                                        rd: rd,
-                                        n: BarrelShiftOp::ROR(rd, ShiftSize::Imm(bits(7, 0))),
-                                    });
-                                }
-                            } else {
-                                println!("TODO");
-                            }
-                        }
-                    }
-                    0b0100 => {
-                        // println!("TODO: decode STR, LDR, STRB, and LDRB(post) with U, T and Imm12");
-                    }
-                    0b0101 => {
-                        // println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, W, and Imm12");
-                    }
-                    0b0110 => {
-                        // println!("TODO: decode STR, LDR, STRB, and LDRB(pre) with U, T, and \
-                        //           shift op");
-                    }
-                    0b1010 => {
-                        mnemonic = Some(Mnemonic::B);
-                        template = Some(InstructionTemplate::Cond_Offset {
-                            cond: cond,
-                            offset: bits(23, 0),
-                        });
-                    }
-                    0b1011 => {
-                        mnemonic = Some(Mnemonic::BL);
-                        template = Some(InstructionTemplate::Cond_Offset {
-                            cond: cond,
-                            offset: bits(23, 0),
-                        });
-                    }
-                    x => println!("Unrecognized bits [27:24]: {:04b}", x),
-                }
-            }
-            None => {
-                println!("TODO: decode unconditional instructions");
-            }
-        }
-
-        if let (Some(mnem), Some(args)) = (mnemonic, template) {
-            Some(Instruction::new(mnem, args))
-        } else {
-            None
+        match Condition::decode(bits(code, 31, 28)) {
+            Some(condition) =>
+                if let Some(instr) = Self::decode_conditional(code) {
+                    Some(Instruction::Cond(instr, condition))
+                } else {
+                    None
+                },
+            None =>
+                if let Some(instr) = Self::decode_unconditional(code) {
+                    Some(Instruction::Uncond(instr))
+                } else {
+                    None
+                },
         }
     }
+
+    fn decode_conditional(code: u32) -> Option<CondInstr> {
+        match bits(code, 27, 24) {
+            0b0001 => {
+                if bits(code, 21, 16) == 0b001111 && bits(code, 11, 0) == 0 {
+                    Some(CondInstr::MRS {
+                        rd: RegisterBank::decode(bits(code, 15, 12)),
+                        psr: if bits(code, 22, 22) == 0 {
+                            RegisterBank::CPSR
+                        } else {
+                            RegisterBank::SPSR
+                        },
+                    })
+                } else {
+                    // TODO
+                    None
+                }
+            },
+            0b1010 => {
+                let offset_bits = bits(code, 23, 0);
+                let signed_num = {
+                    if offset_bits & (1 << 23) == 0 {
+                        offset_bits as i32
+                    } else {
+                        let hi_mask: u32 = 0b11111111 << 24;
+                        (offset_bits | hi_mask) as i32
+                    }
+                };
+                let rel_offset = 8 + (signed_num << 2);
+                Some(CondInstr::B(rel_offset))
+            },
+            x => {
+                println!("TODO: decode conditional with bits [27:24] of {:04b}", x);
+                None
+            }
+        }
+    }
+
+    fn decode_unconditional(_code: u32) -> Option<UncondInstr> {
+        None
+    }
 }
+
+
 
 #[cfg(test)]
 mod test {
-    use super::{Condition, Instruction, InstructionTemplate, Mnemonic};
+    use super::{Condition, Instruction, CondInstr};
     use registers::RegisterBank;
 
     #[test]
     fn decode_branch_instruction() {
         assert_eq!(
             Instruction::decode(0b1110_1010_000000000000000010111110).unwrap(),
-            Instruction::new(Mnemonic::B,
-                             InstructionTemplate::Cond_Offset {
-                                 cond: Condition::AL,
-                                 offset: 190,
-                             }));
+            Instruction::Cond(
+                CondInstr::B(768),
+                Condition::AL));
 
-        assert_eq!(
-            Instruction::decode(0b1110_0001_000011110000000000000000).unwrap(),
-            Instruction::new(Mnemonic::MRS,
-                             InstructionTemplate::Cond_Rd_PSR {
-                                 cond: Condition::AL,
-                                 rd: RegisterBank::R0,
-                                 psr: RegisterBank::CPSR,
-                             }));
+
+        // assert_eq!(
+        //     Instruction::decode(0b1110_0001_000011110000000000000000).unwrap(),
+        //     Instruction::new(Mnemonic::MRS,
+        //                      InstructionTemplate::Cond_Rd_PSR {
+        //                          cond: Condition::AL,
+        //                          rd: RegisterBank::R0,
+        //                          psr: RegisterBank::CPSR,
+        //                      }));
     }
 
 }
