@@ -218,6 +218,7 @@ pub enum CondInstr {
 
     B(i32),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
+    MRC { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
     ORR { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
@@ -374,6 +375,28 @@ impl Instruction {
                 let rel_offset = 8 + (signed_num << 2);
                 Some(CondInstr::B(rel_offset))
             },
+            0b1110 => {
+                let cn = bits(code, 19, 16);
+                let copro = bits(code, 11, 8);
+                let op2 = bits(code, 7, 5);
+                let cm = bits(code, 3, 0);
+                if bits(code, 4, 4) == 0 {
+                    None        // TODO: CDP
+                } else {
+                    if bits(code, 20, 20) == 0 {
+                        None    // TODO: MCR
+                    } else {
+                        Some(CondInstr::MRC {
+                            op1: bits(code, 23, 21),
+                            cn: cn,
+                            rd: RegisterBank::decode(bits(code, 15, 12)),
+                            copro: copro,
+                            op2: op2,
+                            cm: cm,
+                        })
+                    }
+                }
+            },
             x => {
                 None
             }
@@ -461,6 +484,19 @@ mod test {
                      c: true,
                  },
                  Condition::AL)),
+
+            (0b1110_1110_0001_0001_0000_1111_0001_0000,
+             Instruction::Cond(
+                 CondInstr::MRC {
+                     op1: 0,
+                     cn: 1,
+                     rd: RegisterBank::R0,
+                     copro: 0b1111,
+                     op2: 0,
+                     cm: 0,
+                 },
+                 Condition::AL)),
+
         ];
 
         for (code, expected_instr) in decodings {
