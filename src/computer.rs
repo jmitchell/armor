@@ -8,6 +8,7 @@ use processor::{
     CondInstr,
     Instruction,
     UncondInstr,
+    MOVInstr,
 };
 use registers::{
     ConditionFlag,
@@ -134,9 +135,17 @@ impl Computer {
                 // TODO: implement coprocessors and interpret this instruction
                 println!("Skipping coprocessor logic for now!");
             },
-            CondInstr::MOV { s, rd, shift_size, shift, rm } => {
-                // TODO
-                println!("Skipping MOV logic for now!");
+            CondInstr::MOV(ref mov) => {
+                match mov {
+                    &MOVInstr::Shift { s, rd, shift_size, shift, rm } => {
+                        // TODO
+                        println!("Skipping MOV logic for now!");
+                    },
+                    &MOVInstr::Rotate { s, rd, rotate, immed } => {
+                        // TODO
+                        println!("Skipping MOV logic for now!");
+                    },
+                }
             },
             CondInstr::MRC { op1, cn, rd, copro, op2, cm } => {
                 // TODO: implement coprocessors and interpret this instruction

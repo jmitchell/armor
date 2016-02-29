@@ -212,6 +212,14 @@ impl BarrelShiftOp {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub enum MOVInstr {
+    // TODO: use BarrelShiftOp
+    // TODO: extract parts common to all MOVs back to CondInstr::MOV.
+    Shift { s: bool, rd: RegisterBank, shift_size: u32, shift: u32, rm: RegisterBank },
+    Rotate { s: bool, rd: RegisterBank, rotate: u32, immed: u32 },
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CondInstr {
     // TODO: use BarrelShiftOp
     AND { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
@@ -222,7 +230,7 @@ pub enum CondInstr {
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
-    MOV { s: bool, rd: RegisterBank, shift_size: u32, shift: u32, rm: RegisterBank }, // TODO: use BarrelShiftOp
+    MOV(MOVInstr),
     MRC { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
@@ -316,13 +324,13 @@ impl Instruction {
                     let shift = bits(code, 6, 5);
                     let rm = RegisterBank::decode(bits(code, 3, 0));
                     if bits(code, 22, 22) == 0 {
-                        Some(CondInstr::MOV {
+                        Some(CondInstr::MOV(MOVInstr::Shift {
                             s: s,
                             rd: rd,
                             shift_size: shift_size,
                             shift: shift,
                             rm: rm,
-                        })
+                        }))
                     } else {
                         None
                     }
@@ -408,7 +416,21 @@ impl Instruction {
                             })
                         }
                     } else {
-                        None
+                        assert_eq!(bits(code, 19, 16), 0);
+                        let s = bits(code, 20, 20) == 1;
+                        let rd = RegisterBank::decode(bits(code, 15, 12));
+                        let rotate = bits(code, 11, 8);
+                        let immed = bits(code, 7, 0);
+                        if bits(code, 22, 22) == 0 {
+                            Some(CondInstr::MOV(MOVInstr::Rotate {
+                                s: s,
+                                rd: rd,
+                                rotate: rotate,
+                                immed: immed,
+                            }))
+                        } else {
+                            None // MVN
+                        }
                     }
                 }
             },
@@ -511,7 +533,7 @@ impl Instruction {
 
 #[cfg(test)]
 mod test {
-    use super::{Condition, Instruction, CondInstr};
+    use super::{Condition, Instruction, CondInstr, MOVInstr};
     use registers::RegisterBank;
 
     #[test]
@@ -626,13 +648,13 @@ mod test {
 
             (0b1110_0001_1010_0000_0000_0000_0000_1101,
              Instruction::Cond(
-                 CondInstr::MOV {
+                 CondInstr::MOV(MOVInstr::Shift {
                      s: false,
                      rd: RegisterBank::R0,
                      shift_size: 0,
                      shift: 0,
                      rm: RegisterBank::R13,
-                 },
+                 }),
                  Condition::AL)),
 
             (0b1110_0010_0100_0000_0000_1101_0001_0011,
@@ -659,6 +681,17 @@ mod test {
                      rn: RegisterBank::R13,
                      reg_list: vec![ RegisterBank::R4, RegisterBank::R14 ],
                  },
+                 Condition::AL)),
+
+            (0b1110_0011_1010_0000_0001_0000_0000_0000,
+             Instruction::Cond(
+                 // TODO: support this other MOV instruction too
+                 CondInstr::MOV(MOVInstr::Rotate {
+                     s: false,
+                     rd: RegisterBank::R1,
+                     rotate: 0,
+                     immed: 0,
+                 }),
                  Condition::AL)),
         ];
 
