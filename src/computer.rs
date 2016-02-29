@@ -100,6 +100,17 @@ impl Computer {
                 // hack to invert effect of PC increment behavior
                 pc.bits -= 4;
             },
+            CondInstr::BIC { s, rd, rn, rotate, immed } => {
+                let val = self.register(rn).unwrap().bits & !Self::ror(immed, 2 * rotate);
+                let cpsr = self.register(RegisterBank::CPSR).unwrap();
+                if s {
+                    // TODO: update C according to shifter carry
+                    // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                    cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
+                    cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0);
+                }
+            },
             CondInstr::MRS { rd, psr } => {
                 self.copy_register(rd, psr);
             },
