@@ -558,7 +558,7 @@ mod test {
 
             (0b1110_1011_0000_0000_0000_0000_0011_1001,
              Instruction::Cond(
-                 CondInstr::BL(0b0000_0000_0000_0000_0011_1001),
+                 CondInstr::BL(236),
                  Condition::AL)),
 
 
