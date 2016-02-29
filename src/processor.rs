@@ -221,6 +221,7 @@ pub enum CondInstr {
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
+    MOV { s: bool, rd: RegisterBank, shift_size: u32, shift: u32, rm: RegisterBank }, // TODO: use BarrelShiftOp
     MRC { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
@@ -305,8 +306,24 @@ impl Instruction {
                         x: bits(code, 17, 17) == 1,
                         c: bits(code, 16, 16) == 1,
                     })
+                } else if bits(code, 23, 23) == 1 && bits(code, 21, 21) == 1 && bits(code, 19, 16) == 0 && bits(code, 7, 7) == 0 && bits(code, 4, 4) == 0 {
+                    let s = bits(code, 20, 20) == 1;
+                    let rd = RegisterBank::decode(bits(code, 15, 12));
+                    let shift_size = bits(code, 11, 7);
+                    let shift = bits(code, 6, 5);
+                    let rm = RegisterBank::decode(bits(code, 3, 0));
+                    if bits(code, 22, 22) == 0 {
+                        Some(CondInstr::MOV {
+                            s: s,
+                            rd: rd,
+                            shift_size: shift_size,
+                            shift: shift,
+                            rm: rm,
+                        })
+                    } else {
+                        None
+                    }
                 } else {
-                    // TODO
                     None
                 }
             },
@@ -561,7 +578,16 @@ mod test {
                  CondInstr::BL(236),
                  Condition::AL)),
 
-
+            (0b1110_0001_1010_0000_0000_0000_0000_1101,
+             Instruction::Cond(
+                 CondInstr::MOV {
+                     s: false,
+                     rd: RegisterBank::R0,
+                     shift_size: 0,
+                     shift: 0,
+                     rm: RegisterBank::R13,
+                 },
+                 Condition::AL)),
         ];
 
         for (code, expected_instr) in decodings {

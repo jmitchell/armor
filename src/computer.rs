@@ -130,6 +130,10 @@ impl Computer {
                 // TODO: implement coprocessors and interpret this instruction
                 println!("Skipping coprocessor logic for now!");
             },
+            CondInstr::MOV { s, rd, shift_size, shift, rm } => {
+                // TODO
+                println!("Skipping MOV logic for now!");
+            },
             CondInstr::MRC { op1, cn, rd, copro, op2, cm } => {
                 // TODO: implement coprocessors and interpret this instruction
                 println!("Skipping coprocessor logic for now!");
