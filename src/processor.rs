@@ -218,6 +218,7 @@ pub enum CondInstr {
 
     B(i32),
     BL(i32),
+    BX(RegisterBank),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
@@ -323,6 +324,13 @@ impl Instruction {
                         })
                     } else {
                         None
+                    }
+                } else if bits(code, 23, 6) == 0b0010_1111_1111_1111_00 && bits(code, 4, 4) == 1 {
+                    if bits(code, 5, 5) == 0 {
+                        let rm = RegisterBank::decode(bits(code, 3, 0));
+                        Some(CondInstr::BX(rm))
+                    } else {
+                        None // BLX
                     }
                 } else {
                     None
@@ -607,6 +615,11 @@ mod test {
                      rotate: 0b1101,
                      immed: 0b00010011,
                  },
+                 Condition::AL)),
+
+            (0b1110_0001_0010_1111_1111_1111_0001_1110,
+             Instruction::Cond(
+                 CondInstr::BX(RegisterBank::R14),
                  Condition::AL)),
         ];
 

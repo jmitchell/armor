@@ -122,6 +122,10 @@ impl Computer {
                     cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0);
                 }
             },
+            CondInstr::BX(rm) => {
+                // TODO
+                println!("Skipping BX logic for now!");
+            },
             CondInstr::LDR { u, w, rd, rn, immed12 } => {
                 // TODO
                 println!("Skipping LDR logic for now!");
