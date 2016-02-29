@@ -218,6 +218,7 @@ pub enum CondInstr {
 
     B(i32),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
+    LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MRC { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
@@ -361,6 +362,25 @@ impl Instruction {
                     } else {
                         None
                     }
+                }
+            },
+            0b0101 => {
+                let u = bits(code, 23, 23) == 1;
+                let w = bits(code, 21, 21) == 1;
+                let rn = RegisterBank::decode(bits(code, 19, 16));
+                let rd = RegisterBank::decode(bits(code, 15, 12));
+                let immed12 = bits(code, 11, 0);
+                match (bits(code, 22, 22) << 1) | bits(code, 20, 20) {
+                    0b01 => {
+                        Some(CondInstr::LDR {
+                            u: u,
+                            w: w,
+                            rd: rd,
+                            rn: rn,
+                            immed12: immed12,
+                        })
+                    },
+                    _ => None
                 }
             },
             0b1010 => {
@@ -516,6 +536,17 @@ mod test {
                      copro: 0b1111,
                      op2: 0,
                      cm: 0,
+                 },
+                 Condition::AL)),
+
+            (0b1110_0101_1001_1111_0000_0000_0110_1100,
+             Instruction::Cond(
+                 CondInstr::LDR {
+                     u: true,
+                     w: false,
+                     rd: RegisterBank::R0,
+                     rn: RegisterBank::R15,
+                     immed12: 0b0000_0110_1100,
                  },
                  Condition::AL)),
         ];

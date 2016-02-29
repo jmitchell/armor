@@ -111,6 +111,10 @@ impl Computer {
                     cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0);
                 }
             },
+            CondInstr::LDR { u, w, rd, rn, immed12 } => {
+                // TODO
+                println!("Skipping LDR logic for now!");
+            },
             CondInstr::MCR { op1, cn, rd, copro, op2, cm } => {
                 // TODO: implement coprocessors and interpret this instruction
                 println!("Skipping coprocessor logic for now!");
