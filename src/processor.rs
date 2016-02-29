@@ -220,6 +220,7 @@ pub enum CondInstr {
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
     //MSR { psr: RegisterBank, f: bool, s: bool, x: bool, c: bool, rotate: u32, immed: u32 },
+    ORR { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
     // TODO: Remove when done. Helps avert unreachable pattern errors
@@ -326,7 +327,13 @@ impl Instruction {
                         let rotate = bits(code, 11, 8);
                         let immed = bits(code, 7, 0);
                         if bits(code, 22, 22) == 0 {
-                            None // TODO: ORR
+                            Some(CondInstr::ORR {
+                                s: s,
+                                rd: rd,
+                                rn: rn,
+                                rotate: rotate,
+                                immed: immed,
+                            })
                         } else {
                             Some(CondInstr::BIC {
                                 s: s,
@@ -418,6 +425,19 @@ mod test {
                      immed: 0b00011111,
                  },
                  Condition::NE)),
+
+            (0b0001_0011_1000_00000000000000010011,
+             Instruction::Cond(
+                 CondInstr::ORR {
+                     s: false,
+                     rd: RegisterBank::R0,
+                     rn: RegisterBank::R0,
+                     rotate: 0,
+                     immed: 0b00010011,
+                 },
+                 Condition::NE)),
+
+
         ];
 
         for (code, expected_instr) in decodings {

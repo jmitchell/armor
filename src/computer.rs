@@ -114,6 +114,19 @@ impl Computer {
             CondInstr::MRS { rd, psr } => {
                 self.copy_register(rd, psr);
             },
+            CondInstr::ORR { s, rd, rn, rotate, immed } => {
+                // TODO: address Notes section of ORR in A.3.
+
+                let val = self.register(rn).unwrap().bits | Self::ror(immed, 2 * rotate);
+                let cpsr = self.register(RegisterBank::CPSR).unwrap();
+                if s {
+                    // TODO: update C according to shifter carry
+                    // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                    cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
+                    cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0);
+                }
+            },
             CondInstr::TEQ { rn, rotate, immed } => {
                 let shift = Self::ror(immed, 2 * rotate);
                 let val = self.register(rn).unwrap().bits ^ shift;
