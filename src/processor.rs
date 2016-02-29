@@ -217,6 +217,7 @@ pub enum CondInstr {
     AND { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
 
     B(i32),
+    BL(i32),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
@@ -263,6 +264,18 @@ impl Instruction {
                     None
                 },
         }
+    }
+
+    fn rel_offset(offset_bits: u32) -> i32 {
+        let signed_num = {
+            if offset_bits & (1 << 23) == 0 {
+                offset_bits as i32
+            } else {
+                let hi_mask: u32 = 0b11111111 << 24;
+                (offset_bits | hi_mask) as i32
+            }
+        };
+        8 + (signed_num << 2)
     }
 
     fn decode_conditional(code: u32) -> Option<CondInstr> {
@@ -384,17 +397,10 @@ impl Instruction {
                 }
             },
             0b1010 => {
-                let offset_bits = bits(code, 23, 0);
-                let signed_num = {
-                    if offset_bits & (1 << 23) == 0 {
-                        offset_bits as i32
-                    } else {
-                        let hi_mask: u32 = 0b11111111 << 24;
-                        (offset_bits | hi_mask) as i32
-                    }
-                };
-                let rel_offset = 8 + (signed_num << 2);
-                Some(CondInstr::B(rel_offset))
+                Some(CondInstr::B(Self::rel_offset(bits(code, 23, 0))))
+            },
+            0b1011 => {
+                Some(CondInstr::BL(Self::rel_offset(bits(code, 23, 0))))
             },
             0b1110 => {
                 let cn = bits(code, 19, 16);
@@ -549,6 +555,13 @@ mod test {
                      immed12: 0b0000_0110_1100,
                  },
                  Condition::AL)),
+
+            (0b1110_1011_0000_0000_0000_0000_0011_1001,
+             Instruction::Cond(
+                 CondInstr::BL(0b0000_0000_0000_0000_0011_1001),
+                 Condition::AL)),
+
+
         ];
 
         for (code, expected_instr) in decodings {

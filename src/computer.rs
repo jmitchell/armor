@@ -100,6 +100,17 @@ impl Computer {
                 // hack to invert effect of PC increment behavior
                 pc.bits -= 4;
             },
+            CondInstr::BL(rel_offset) => {
+                let mut lr = self.register(RegisterBank::R14).unwrap().bits;
+                let ret = self.program_counter().bits + 4;
+                lr = ret;
+
+                let mut pc = self.program_counter();
+                pc.bits = ((pc.bits as i32) + rel_offset) as u32;
+
+                // hack to invert effect of PC increment behavior
+                pc.bits -= 4;
+            },
             CondInstr::BIC { s, rd, rn, rotate, immed } => {
                 let val = self.register(rn).unwrap().bits & !Self::ror(immed, 2 * rotate);
                 let cpsr = self.register(RegisterBank::CPSR).unwrap();
