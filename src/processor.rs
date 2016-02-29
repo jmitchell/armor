@@ -226,6 +226,7 @@ pub enum CondInstr {
     MRS { rd: RegisterBank, psr: RegisterBank },
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
     ORR { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
+    SUB { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
     // TODO: Remove when done. Helps avert unreachable pattern errors
@@ -336,6 +337,14 @@ impl Instruction {
                 match bits(code, 23, 21) {
                     0b000 =>
                         Some(CondInstr::AND {
+                            s: s,
+                            rd: rd,
+                            rn: rn,
+                            rotate: rotate,
+                            immed: immed,
+                        }),
+                    0b010 =>
+                        Some(CondInstr::SUB {
                             s: s,
                             rd: rd,
                             rn: rn,
@@ -586,6 +595,17 @@ mod test {
                      shift_size: 0,
                      shift: 0,
                      rm: RegisterBank::R13,
+                 },
+                 Condition::AL)),
+
+            (0b1110_0010_0100_0000_0000_1101_0001_0011,
+             Instruction::Cond(
+                 CondInstr::SUB {
+                     s: false,
+                     rd: RegisterBank::R0,
+                     rn: RegisterBank::R0,
+                     rotate: 0b1101,
+                     immed: 0b00010011,
                  },
                  Condition::AL)),
         ];

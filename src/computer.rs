@@ -169,6 +169,10 @@ impl Computer {
                     cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0);
                 }
             },
+            CondInstr::SUB { s, rd, rn, rotate, immed } => {
+                // TODO
+                println!("Skipping SUB logic for now!");
+            },
             CondInstr::TEQ { rn, rotate, immed } => {
                 let shift = Self::ror(immed, 2 * rotate);
                 let val = self.register(rn).unwrap().bits ^ shift;
