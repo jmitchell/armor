@@ -125,7 +125,7 @@ impl Computer {
             },
             CondInstr::BX(rm) => {
                 // TODO
-                println!("Skipping BX logic for now!");
+                panic!("Implement BX logic!");
             },
             CondInstr::LDR { u, w, rd, rn, immed12 } => {
                 // TODO
