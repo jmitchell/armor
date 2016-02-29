@@ -219,7 +219,7 @@ pub enum CondInstr {
     B(i32),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
-    //MSR { psr: RegisterBank, f: bool, s: bool, x: bool, c: bool, rotate: u32, immed: u32 },
+    MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
     ORR { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
@@ -275,6 +275,19 @@ impl Instruction {
                         } else {
                             RegisterBank::SPSR
                         },
+                    })
+                } else if bits(code, 21, 20) == 2 && bits(code, 15, 4) == 0b111100000000 {
+                    Some(CondInstr::MSR {
+                        psr: if bits(code, 22, 22) == 0 {
+                            RegisterBank::CPSR
+                        } else {
+                            RegisterBank::SPSR
+                        },
+                        rm: RegisterBank::decode(bits(code, 3, 0)),
+                        f: bits(code, 19, 19) == 1,
+                        s: bits(code, 18, 18) == 1,
+                        x: bits(code, 17, 17) == 1,
+                        c: bits(code, 16, 16) == 1,
                     })
                 } else {
                     // TODO
@@ -437,7 +450,17 @@ mod test {
                  },
                  Condition::NE)),
 
-
+            (0b1110_0001_0010_1001_1111000000000000,
+             Instruction::Cond(
+                 CondInstr::MSR {
+                     psr: RegisterBank::CPSR,
+                     rm: RegisterBank::R0,
+                     f: true,
+                     s: false,
+                     x: false,
+                     c: true,
+                 },
+                 Condition::AL)),
         ];
 
         for (code, expected_instr) in decodings {

@@ -114,6 +114,21 @@ impl Computer {
             CondInstr::MRS { rd, psr } => {
                 self.copy_register(rd, psr);
             },
+            CondInstr::MSR { psr, rm, f, s, x, c } => {
+                // TODO: observe note that bits[23:0] of the cpsr are
+                // unaffected in User mode.
+                let mask: u32 = {
+                    let c_mask = if c { 0x000000ff } else { 0 };
+                    let x_mask = if x { 0x0000ff00 } else { 0 };
+                    let s_mask = if s { 0x00ff0000 } else { 0 };
+                    let f_mask = if f { 0xff000000 } else { 0 };
+                    c_mask | x_mask | s_mask | f_mask
+                };
+                let mut psr_bits = self.register(psr).unwrap().bits;
+                let masked_psr = psr_bits & !mask;
+                let masked_reg = self.register(rm).unwrap().bits & mask;
+                psr_bits = masked_psr | masked_reg;
+            },
             CondInstr::ORR { s, rd, rn, rotate, immed } => {
                 // TODO: address Notes section of ORR in A.3.
 
