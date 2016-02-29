@@ -173,6 +173,10 @@ impl Computer {
                     cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0);
                 }
             },
+            CondInstr::STMDB { carrot, w, rn, ref reg_list } => {
+                // TODO
+                println!("Skipping STMDB logic for now!");
+            },
             CondInstr::SUB { s, rd, rn, rotate, immed } => {
                 // TODO
                 println!("Skipping SUB logic for now!");

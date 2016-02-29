@@ -227,6 +227,7 @@ pub enum CondInstr {
     MRS { rd: RegisterBank, psr: RegisterBank },
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
     ORR { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
+    STMDB { carrot: bool, w: bool, rn: RegisterBank, reg_list: Vec<RegisterBank> },
     SUB { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
@@ -430,6 +431,34 @@ impl Instruction {
                     _ => None
                 }
             },
+            0b1001 => {
+                let carrot = bits(code, 22, 22) == 1;
+                let w = bits(code, 21, 21) == 1;
+                let rn = RegisterBank::decode(bits(code, 19, 16));
+                let reg_list = {
+                    let mut regs = vec![];
+                    let mut n = bits(code, 15, 0);
+                    let mut i = 0;
+                    loop {
+                        if n % 2 == 1 {
+                            regs.push(RegisterBank::decode(i));
+                        }
+                        n >>= 1;
+                        i += 1;
+
+                        if n == 0 {
+                            break;
+                        }
+                    }
+                    regs
+                };
+                Some(CondInstr::STMDB {
+                    carrot: carrot,
+                    w: w,
+                    rn: rn,
+                    reg_list: reg_list,
+                })
+            },
             0b1010 => {
                 Some(CondInstr::B(Self::rel_offset(bits(code, 23, 0))))
             },
@@ -620,6 +649,16 @@ mod test {
             (0b1110_0001_0010_1111_1111_1111_0001_1110,
              Instruction::Cond(
                  CondInstr::BX(RegisterBank::R14),
+                 Condition::AL)),
+
+            (0b1110_1001_0010_1101_0100_0000_0001_0000,
+             Instruction::Cond(
+                 CondInstr::STMDB {
+                     carrot: false,
+                     w: true,
+                     rn: RegisterBank::R13,
+                     reg_list: vec![ RegisterBank::R4, RegisterBank::R14 ],
+                 },
                  Condition::AL)),
         ];
 
