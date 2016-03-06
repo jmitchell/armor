@@ -125,16 +125,21 @@ fn handle_step(_args: &[&str], computer: &mut Computer) {
 
 fn handle_run(_args: &[&str], computer: &mut Computer) {
     println!("");
+    let mut prev_addr: Option<u32> = None;
     loop {
         // TODO: refactor code copied from handle_print_code.
         let pc_addr = computer.cpu.register_file.lookup(RegisterBank::R15).unwrap().bits;
         assert!(pc_addr % 4 == 0);
+        if prev_addr.is_some() && pc_addr != prev_addr.unwrap() + 4 {
+            println!("");
+        }
         print!("\t0x{:08x}: ", pc_addr);
         match computer.instruction_at(pc_addr as u64) {
             Err(s) => println!("{}", s),
             Ok(instr) => println!("{:?}", instr),
         }
         computer.execute_next_instruction();
+        prev_addr = Some(pc_addr);
     }
 }
 
