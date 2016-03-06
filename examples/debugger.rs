@@ -136,7 +136,7 @@ fn handle_run(_args: &[&str], computer: &mut Computer) {
         print!("\t0x{:08x}: ", pc_addr);
         match computer.instruction_at(pc_addr as u64) {
             Err(s) => println!("{}", s),
-            Ok(instr) => println!("{:?}", instr),
+            Ok(instr) => println!("{}", instr.as_str()),
         }
         computer.execute_next_instruction();
         prev_addr = Some(pc_addr);

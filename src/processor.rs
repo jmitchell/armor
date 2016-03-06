@@ -260,7 +260,35 @@ fn bits(n: u32, hi: u16, lo: u16) -> u32 {
     (n >> lo) & mask
 }
 
+fn cond_as_str(instr: &CondInstr, cond: &Condition) -> String {
+    let cond_str = if *cond == Condition::AL {
+        "".to_owned()
+    } else {
+        format!("{:?}", *cond)
+    };
+
+    match *instr {
+        // TODO: compute effective address after rel_offset
+        // CondInstr::B(rel_offset) => format!("B{} 0x{:0x}", cond_str, rel_offset),
+        // CondInstr::BL(rel_offset) => format!("BL{} 0x{:0x}", cond_str, rel_offset),
+
+        // TODO: add remaining instructions
+        _ => format!("{:?} {:?}", cond, instr)
+    }
+}
+
+fn uncond_as_str(instr: &UncondInstr) -> String {
+    format!("{:?}", instr)
+}
+
 impl Instruction {
+    pub fn as_str(&self) -> String {
+        return match self {
+            &Instruction::Cond(ref instr, ref cond) => cond_as_str(instr, cond),
+            &Instruction::Uncond(ref instr) => uncond_as_str(instr),
+        }
+    }
+
     fn decode(code: u32) -> Option<Instruction> {
         match Condition::decode(bits(code, 31, 28)) {
             Some(condition) =>
