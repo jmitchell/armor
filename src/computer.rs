@@ -102,9 +102,11 @@ impl Computer {
                 pc.bits -= 4;
             },
             CondInstr::BL(rel_offset) => {
-                let mut lr = self.register(RegisterBank::R14).unwrap().bits;
                 let ret = self.program_counter().bits + 4;
-                lr = ret;
+                {
+                    let mut lr = self.register(RegisterBank::R14).unwrap();
+                    lr.bits = ret;
+                }
 
                 let mut pc = self.program_counter();
                 pc.bits = ((pc.bits as i32) + rel_offset) as u32;
@@ -124,8 +126,15 @@ impl Computer {
                 }
             },
             CondInstr::BX(rm) => {
-                // TODO
-                panic!("Implement BX logic!");
+                let val = self.register(rm).unwrap().bits & 0xfffffffe;
+                let mut pc = self.program_counter();
+                pc.bits = val;
+
+                // hack to invert effect of PC increment behavior
+                pc.bits -= 4;
+
+                // TODO: Set T-flag to 'Rm & 1' (may enable Thumb
+                // mode)
             },
             CondInstr::LDR { u, w, rd, rn, immed12 } => {
                 // TODO
