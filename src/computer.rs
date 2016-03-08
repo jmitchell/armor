@@ -136,9 +136,20 @@ impl Computer {
                 // TODO: Set T-flag to 'Rm & 1' (may enable Thumb
                 // mode)
             },
-            CondInstr::LDR { u, w, rd, rn, immed12 } => {
-                // TODO
-                println!("Skipping LDR logic for now!");
+            CondInstr::LDR { rd, ref addr_ref } => {
+                let addr = {
+                    let mut rn = self.register(*addr_ref.get_base()).unwrap();
+                    let addr = addr_ref.get_addr(rn);
+                    addr_ref.handle_writeback(&mut rn);
+                    addr
+                };
+
+                if let Some(word) = self.mem.get32(addr, self.big_endian) {
+                    let mut rd = self.register(rd).unwrap();
+                    rd.bits = word;
+                } else {
+                    panic!("Failed to read memory at address {:#x}", addr);
+                }
             },
             CondInstr::MCR { op1, cn, rd, copro, op2, cm } => {
                 // TODO: implement coprocessors and interpret this instruction

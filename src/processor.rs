@@ -3,7 +3,12 @@
 #![allow(non_camel_case_types)]
 #![allow(dead_code)]            // TODO: remove
 
-use registers::{RegisterBank, RegisterFile};
+use address::Address;
+use registers::{
+    Register32,
+    RegisterBank,
+    RegisterFile,
+};
 
 
 pub struct Processor {
@@ -212,6 +217,102 @@ impl BarrelShiftOp {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+pub enum AddressingOffset12 {
+    Immed { base_addr: RegisterBank, offset12: u16 },
+    Register { base_addr: RegisterBank, offset: RegisterBank },
+    // ScaledRegister { base_addr: RegisterBank,
+}
+
+impl AddressingOffset12 {
+    fn get_base(&self) -> &RegisterBank {
+        match self {
+            &AddressingOffset12::Immed { ref base_addr, offset12 } => base_addr,
+            &AddressingOffset12::Register { ref base_addr, offset } => base_addr,
+        }
+    }
+
+    fn get_offset(&self, positive: bool) -> i32 {
+        match self {
+            &AddressingOffset12::Immed { base_addr: _, offset12: offset } => {
+                if positive {
+                    offset as i32
+                } else {
+                    -(offset as i32)
+                }
+            },
+            &AddressingOffset12::Register { base_addr: _, offset: offset_reg } => {
+                panic!("TODO: need access to offset register");
+            },
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum WordOrUnsignedByte {
+    PreIndex { offset: AddressingOffset12, positive: bool, writeback: bool },
+    PostIndex { offset: AddressingOffset12, positive: bool },
+}
+
+impl WordOrUnsignedByte {
+    pub fn get_addr(&self, rn: &Register32) -> Address {
+        ((rn.bits as i32) + self.get_offset_amount()) as Address
+    }
+
+    pub fn get_base(&self) -> &RegisterBank {
+        &self.get_offset().get_base()
+    }
+
+    fn get_offset_amount(&self) -> i32 {
+        self.get_offset().get_offset(self.is_positive_offset())
+    }
+
+    fn get_offset(&self) -> &AddressingOffset12 {
+        match self {
+            &WordOrUnsignedByte::PreIndex { ref offset, positive, writeback } => offset,
+            &WordOrUnsignedByte::PostIndex { ref offset, positive } => offset,
+        }
+    }
+
+    fn is_positive_offset(&self) -> bool {
+        match self {
+            &WordOrUnsignedByte::PreIndex { ref offset, positive, writeback } => positive,
+            &WordOrUnsignedByte::PostIndex { ref offset, positive } => positive,
+        }
+    }
+
+    fn is_writeback(&self) -> bool {
+        match self {
+            &WordOrUnsignedByte::PreIndex { ref offset, positive, writeback } => writeback,
+            _ => false,
+        }
+    }
+
+    pub fn handle_writeback(&self, rn: &mut Register32) {
+        if self.is_writeback() {
+            panic!("TODO: implement writeback handler");
+            rn.bits = {
+                // FIXME: some value in terms of rn.bits and self.
+                rn.bits         // placeholder
+            };
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum AddressingOffset8 {
+    Immed { base_addr: RegisterBank, offset8: u8 },
+    Register { base_addr: RegisterBank, offset: RegisterBank },
+}
+
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum HalfwordOrSigned {
+    PreIndex { offset: AddressingOffset8, positive: bool, writeback: bool },
+    PostIndex { offset: AddressingOffset8, positive: bool },
+}
+
+
+
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum MOVInstr {
     // TODO: use BarrelShiftOp
     // TODO: extract parts common to all MOVs back to CondInstr::MOV.
@@ -228,7 +329,12 @@ pub enum CondInstr {
     BL(i32),
     BX(RegisterBank),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
-    LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
+    // LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
+    LDR { rd: RegisterBank, addr_ref: WordOrUnsignedByte },
+    LDRB { rd: RegisterBank, addr_ref: WordOrUnsignedByte },
+    LDRH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
+    LDRSB { rd: RegisterBank, addr_ref: HalfwordOrSigned },
+    LDRSH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MOV(MOVInstr),
     MRC { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
@@ -236,6 +342,9 @@ pub enum CondInstr {
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
     ORR { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     STMDB { carrot: bool, w: bool, rn: RegisterBank, reg_list: Vec<RegisterBank> },
+    STR { rd: RegisterBank, addr_ref: HalfwordOrSigned },
+    STRB { rd: RegisterBank, addr_ref: HalfwordOrSigned },
+    STRH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     SUB { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
@@ -470,12 +579,27 @@ impl Instruction {
                 let immed12 = bits(code, 11, 0);
                 match (bits(code, 22, 22) << 1) | bits(code, 20, 20) {
                     0b01 => {
+                        // Some(CondInstr::LDR {
+                        //     u: u,
+                        //     w: w,
+                        //     rd: rd,
+                        //     rn: rn,
+                        //     immed12: immed12,
+                        // })
+
+                        // pre
+                        // W=writeback
+                        // U=up (positive offset, else neg)
                         Some(CondInstr::LDR {
-                            u: u,
-                            w: w,
                             rd: rd,
-                            rn: rn,
-                            immed12: immed12,
+                            addr_ref: WordOrUnsignedByte::PreIndex {
+                                offset: AddressingOffset12::Immed {
+                                    base_addr: rn,
+                                    offset12: immed12 as u16,
+                                },
+                                positive: u,
+                                writeback: w,
+                            },
                         })
                     },
                     _ => None
