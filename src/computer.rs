@@ -223,3 +223,34 @@ impl Computer {
         d.bits = bits;
     }
 }
+
+
+
+#[cfg(test)]
+mod test {
+    use super::Computer;
+    use processor::{
+        Condition,
+        CondInstr,
+        Instruction,
+    };
+
+
+    #[test]
+    fn branch() {
+        let rel_offset = 48;
+        let branch = Instruction::Cond(
+            CondInstr::B(rel_offset),
+            Condition::AL);
+
+        // TODO: Create a Computer with a random PC addr, and the
+        // encoded form of `branch` at that PC addr. Execute one
+        // instruction and assert post-conditions hold.
+    }
+
+    #[test]
+    fn conditional_instructions() {
+        // TODO: Test combinations of `Condition` and CPSR values.
+        // Test both when condition is satisfied and not.
+    }
+}

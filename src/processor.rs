@@ -728,4 +728,12 @@ mod test {
         }
     }
 
+    #[test]
+    fn roundtrip_instructions() {
+        // TODO: For several instructions, verify that
+        //
+        //     decode(encode(instruction)) == instruction
+        //
+        // Requires implementing an encoder.
+    }
 }
