@@ -8,6 +8,7 @@ use processor::{
     Condition,
     CondInstr,
     Instruction,
+    ShiftSize,
     UncondInstr,
 };
 use registers::{
@@ -57,6 +58,10 @@ impl Computer {
         self.cpu.register_file.lookup_mut(reg_bank)
     }
 
+    fn register_bits(&self, reg_bank: RegisterBank) -> u32 {
+        self.cpu.register_file.lookup(reg_bank).unwrap().bits
+    }
+
     fn program_counter(&mut self) -> &mut Register32 {
         self.register(RegisterBank::R15).unwrap()
     }
@@ -85,9 +90,22 @@ impl Computer {
         }
     }
 
-    fn execute_barrel_shift(&mut self, op: &BarrelShiftOp) -> u32 {
-        println!("Skipping barrel shift logic for now!");
-        0
+    fn shift_size(&self, sz: &ShiftSize) -> u32 {
+        match sz {
+            &ShiftSize::Imm(n) => n,
+            &ShiftSize::Reg(r) => self.register_bits(r)
+        }
+    }
+
+    fn execute_barrel_shift(&self, op: &BarrelShiftOp) -> u32 {
+        match op {
+            &BarrelShiftOp::Imm(n) => n,
+            &BarrelShiftOp::RotateImmed { immed, rotate } =>
+                Self::ror(immed, 2 * rotate),
+            &BarrelShiftOp::LSL(ref reg, ref shift_size) =>
+                self.register_bits(*reg) << self.shift_size(shift_size),
+            _ => panic!("unhandled barrel shift op"),
+        }
     }
 
     fn execute_conditional(&mut self, instr: &CondInstr) {
