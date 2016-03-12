@@ -555,7 +555,7 @@ impl Instruction {
                                 rd: rd,
                                 shift_op: BarrelShiftOp::RotateImmed {
                                     immed: immed,
-                                    rotate: 2 * rotate,
+                                    rotate: rotate,
                                 },
                             })
                         } else {
