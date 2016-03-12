@@ -685,7 +685,7 @@ impl Instruction {
 
 #[cfg(test)]
 mod test {
-    use super::{Condition, Instruction, CondInstr, MOVInstr};
+    use super::{Condition, Instruction, CondInstr, MOVInstr, WordOrUnsignedByte, AddressingOffset12};
     use registers::RegisterBank;
 
     #[test]
@@ -785,11 +785,15 @@ mod test {
             (0b1110_0101_1001_1111_0000_0000_0110_1100,
              Instruction::Cond(
                  CondInstr::LDR {
-                     u: true,
-                     w: false,
                      rd: RegisterBank::R0,
-                     rn: RegisterBank::R15,
-                     immed12: 0b0000_0110_1100,
+                     addr_ref: WordOrUnsignedByte::PreIndex {
+                         offset: AddressingOffset12::Immed {
+                             base_addr: RegisterBank::R15,
+                             offset12: 0b0000_0110_1100,
+                         },
+                         positive: true,
+                         writeback: false,
+                     }
                  },
                  Condition::AL)),
 
