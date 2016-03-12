@@ -157,11 +157,12 @@ pub enum BarrelShiftOp {
     LSR(RegisterBank, ShiftSize),
     ASR(RegisterBank, ShiftSize),
     ROR(RegisterBank, ShiftSize),
+    RotateImmed { immed: u32, rotate: u32 },
     RRX(RegisterBank),
 }
 
 impl BarrelShiftOp {
-    fn decode(src_reg: RegisterBank, op_code: u32, shift_size: ShiftSize) -> Option<BarrelShiftOp> {
+    pub fn decode(src_reg: RegisterBank, op_code: u32, shift_size: ShiftSize) -> Option<BarrelShiftOp> {
         debug_assert!(match shift_size {
             ShiftSize::Imm(n) => n <= 32,
             ShiftSize::Reg(_) => true,
@@ -313,14 +314,6 @@ pub enum HalfwordOrSigned {
 
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub enum MOVInstr {
-    // TODO: use BarrelShiftOp
-    // TODO: extract parts common to all MOVs back to CondInstr::MOV.
-    Shift { s: bool, rd: RegisterBank, shift_size: u32, shift: u32, rm: RegisterBank },
-    Rotate { s: bool, rd: RegisterBank, rotate: u32, immed: u32 },
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum CondInstr {
     // TODO: use BarrelShiftOp
     AND { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
@@ -336,7 +329,7 @@ pub enum CondInstr {
     LDRSB { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     LDRSH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     MCR { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
-    MOV(MOVInstr),
+    MOV { s: bool, rd: RegisterBank, shift_op: BarrelShiftOp },
     MRC { op1: u32, cn: u32, rd: RegisterBank, copro: u32, op2: u32, cm: u32 },
     MRS { rd: RegisterBank, psr: RegisterBank },
     MSR { psr: RegisterBank, rm: RegisterBank, f: bool, s: bool, x: bool, c: bool },
@@ -457,17 +450,15 @@ impl Instruction {
                 } else if bits(code, 23, 23) == 1 && bits(code, 21, 21) == 1 && bits(code, 19, 16) == 0 && bits(code, 7, 7) == 0 && bits(code, 4, 4) == 0 {
                     let s = bits(code, 20, 20) == 1;
                     let rd = RegisterBank::decode(bits(code, 15, 12));
-                    let shift_size = bits(code, 11, 7);
-                    let shift = bits(code, 6, 5);
+                    let shift_size = ShiftSize::Imm(bits(code, 11, 7));
+                    let shift_code = bits(code, 6, 5);
                     let rm = RegisterBank::decode(bits(code, 3, 0));
                     if bits(code, 22, 22) == 0 {
-                        Some(CondInstr::MOV(MOVInstr::Shift {
+                        Some(CondInstr::MOV {
                             s: s,
                             rd: rd,
-                            shift_size: shift_size,
-                            shift: shift,
-                            rm: rm,
-                        }))
+                            shift_op: BarrelShiftOp::decode(rm, shift_code, shift_size).unwrap(),
+                        })
                     } else {
                         None
                     }
@@ -559,12 +550,14 @@ impl Instruction {
                         let rotate = bits(code, 11, 8);
                         let immed = bits(code, 7, 0);
                         if bits(code, 22, 22) == 0 {
-                            Some(CondInstr::MOV(MOVInstr::Rotate {
+                            Some(CondInstr::MOV {
                                 s: s,
                                 rd: rd,
-                                rotate: rotate,
-                                immed: immed,
-                            }))
+                                shift_op: BarrelShiftOp::RotateImmed {
+                                    immed: immed,
+                                    rotate: 2 * rotate,
+                                },
+                            })
                         } else {
                             None // MVN
                         }
@@ -685,7 +678,7 @@ impl Instruction {
 
 #[cfg(test)]
 mod test {
-    use super::{Condition, Instruction, CondInstr, MOVInstr, WordOrUnsignedByte, AddressingOffset12};
+    use super::{Condition, Instruction, CondInstr, WordOrUnsignedByte, AddressingOffset12, ShiftSize, BarrelShiftOp};
     use registers::RegisterBank;
 
     #[test]
@@ -804,13 +797,11 @@ mod test {
 
             (0b1110_0001_1010_0000_0000_0000_0000_1101,
              Instruction::Cond(
-                 CondInstr::MOV(MOVInstr::Shift {
+                 CondInstr::MOV {
                      s: false,
                      rd: RegisterBank::R0,
-                     shift_size: 0,
-                     shift: 0,
-                     rm: RegisterBank::R13,
-                 }),
+                     shift_op: BarrelShiftOp::LSL(RegisterBank::R13, ShiftSize::Imm(0)),
+                 },
                  Condition::AL)),
 
             (0b1110_0010_0100_0000_0000_1101_0001_0011,
@@ -842,12 +833,14 @@ mod test {
             (0b1110_0011_1010_0000_0001_0000_0000_0000,
              Instruction::Cond(
                  // TODO: support this other MOV instruction too
-                 CondInstr::MOV(MOVInstr::Rotate {
+                 CondInstr::MOV {
                      s: false,
                      rd: RegisterBank::R1,
-                     rotate: 0,
-                     immed: 0,
-                 }),
+                     shift_op: BarrelShiftOp::RotateImmed {
+                         immed: 0,
+                         rotate: 0,
+                     },
+                 },
                  Condition::AL)),
         ];
 

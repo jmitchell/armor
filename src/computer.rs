@@ -4,11 +4,11 @@ use address;
 use address::Region;
 use processor;
 use processor::{
+    BarrelShiftOp,
     Condition,
     CondInstr,
     Instruction,
     UncondInstr,
-    MOVInstr,
 };
 use registers::{
     ConditionFlag,
@@ -85,6 +85,11 @@ impl Computer {
         }
     }
 
+    fn execute_barrel_shift(&mut self, op: &BarrelShiftOp) -> u32 {
+        println!("Skipping barrel shift logic for now!");
+        0
+    }
+
     fn execute_conditional(&mut self, instr: &CondInstr) {
         match *instr {
             CondInstr::AND { s, rd, rn, rotate, immed } => {
@@ -155,18 +160,14 @@ impl Computer {
                 // TODO: implement coprocessors and interpret this instruction
                 println!("Skipping coprocessor logic for now!");
             },
-            CondInstr::MOV(ref mov) => {
-                match mov {
-                    &MOVInstr::Shift { s, rd, shift_size, shift, rm } => {
-                        // TODO
-                        println!("Skipping MOV logic for now!");
-                    },
-                    &MOVInstr::Rotate { s, rd, rotate, immed } => {
-                        // TODO
-                        println!("Skipping MOV logic for now!");
-                    },
+            CondInstr::MOV { s, rd, ref shift_op } => {
+                let shift_result = self.execute_barrel_shift(shift_op);
+                if s {
+                    // TODO: update CPSR
                 }
-            },
+                let mut rd = self.register(rd).unwrap();
+                rd.bits = shift_result;
+            }
             CondInstr::MRC { op1, cn, rd, copro, op2, cm } => {
                 // TODO: implement coprocessors and interpret this instruction
                 println!("Skipping coprocessor logic for now!");
