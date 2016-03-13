@@ -338,7 +338,7 @@ pub enum CondInstr {
     STR { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     STRB { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     STRH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
-    SUB { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
+    SUB { s: bool, rd: RegisterBank, rn: RegisterBank, shift_op: BarrelShiftOp },
     TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
 
     // TODO: Remove when done. Helps avert unreachable pattern errors
@@ -493,8 +493,10 @@ impl Instruction {
                             s: s,
                             rd: rd,
                             rn: rn,
-                            rotate: rotate,
-                            immed: immed,
+                            shift_op: BarrelShiftOp::RotateImmed {
+                                immed: immed,
+                                rotate: rotate,
+                            },
                         }),
                     _ => None
                 }
@@ -810,8 +812,10 @@ mod test {
                      s: false,
                      rd: RegisterBank::R0,
                      rn: RegisterBank::R0,
-                     rotate: 0b1101,
-                     immed: 0b00010011,
+                     shift_op: BarrelShiftOp::RotateImmed {
+                         immed: 0b00010011,
+                         rotate: 0b1101,
+                     },
                  },
                  Condition::AL)),
 

@@ -225,9 +225,14 @@ impl Computer {
                 // TODO
                 println!("Skipping STMDB logic for now!");
             },
-            CondInstr::SUB { s, rd, rn, rotate, immed } => {
-                // TODO
-                println!("Skipping SUB logic for now!");
+            CondInstr::SUB { s, rd, rn, ref shift_op } => {
+                let shift_result = self.execute_barrel_shift(shift_op);
+                let sub = self.register_bits(rn) - shift_result;
+                if s {
+                    // TODO: update CPSR
+                }
+                let mut rd = self.register(rd).unwrap();
+                rd.bits = sub;
             },
             CondInstr::TEQ { rn, rotate, immed } => {
                 let shift = Self::ror(immed, 2 * rotate);
