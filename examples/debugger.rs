@@ -5,6 +5,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io;
 use armor::address;
+use armor::address::{
+    Region
+};
 use armor::computer::Computer;
 use armor::registers::{
     ProgramStatusRegister,
@@ -247,9 +250,8 @@ ARMOR Debugging Interface
         println!("Loading boot file: {}", boot_bin_file);
         match load_boot_code(boot_bin_file) {
             Ok(boot_code) => {
-                // TODO: deal with ROM size limit
-                let computer = &mut Computer::new(boot_code[..65535].to_vec());
-                debugger_repl(computer).is_ok();
+                let mut computer = Computer::new(boot_code);
+                debugger_repl(&mut computer).is_ok();
             },
             Err(_) => panic!("Unexpected error while loading boot code file"),
         }

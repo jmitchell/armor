@@ -67,8 +67,12 @@ pub trait Region : Addressable {
         self.contains_address(&(*region).start()) || self.contains_address(&(*region).end())
     }
 
-    fn write_cells(&mut self, data: Vec<Cell>, addr: Address) {
+    fn write_cells(&mut self, data: &[Cell], addr: Address) {
         assert!(addr >= self.start());
+
+        if data.len() == 0 {
+            return;
+        }
 
         // TODO: clean up using CellCount
         let last_addr = addr + data.len() as u64 - 1;
@@ -78,9 +82,9 @@ pub trait Region : Addressable {
             match self.get_mut(i) {
                 Some(cell) => {
                     assert!(i <= usize::MAX as u64);
-                    *cell = data[i as usize];
+                    *cell = data[(i - addr) as usize];
                 }
-                None => panic!(),
+                None => panic!("No memory cell at address {:#0x}", i),
             }
         }
     }
@@ -318,15 +322,37 @@ impl MemMap32 {
     /// Create a new 32-bit memory map, with the provided boot machine
     /// code loaded into a ROM chip mapped to address 0x00000000.
     pub fn new(boot_code: Vec<Cell>) -> MemMap32 {
-        assert!(boot_code.len() < 0x00010000);
-
         let mut rom_ram_io = AddressSpace::from_range(0x00000000, 0x3fffffff);
         let mapped_io = AddressSpace::from_range(0x40000000, 0x7fffffff);
         let dram = RandomAccessMemory::new(0x80000000, 0xffffffff);
 
-        let boot_rom = ReadOnlyMemory::new(0x00000000, 0x0000ffff, boot_code);
-        rom_ram_io.lease(Box::new(boot_rom));
-        // TODO: ROM, RAM, SoC I/O (0x00010000 - 0x3fffffff)
+        if boot_code.len() > 0x10000 {
+            let boot_rom = ReadOnlyMemory::new(0x00000000, 0x0000ffff, boot_code[..0x10000].to_vec());
+            rom_ram_io.lease(Box::new(boot_rom));
+
+            let page_size = 0x10000u64;
+            let mut page_num = 0;
+            loop {
+                page_num += 1;
+                let bytes_left: i64 = boot_code.len() as i64 - (page_num * page_size) as i64;
+                if bytes_left <= 0 {
+                    break;
+                } else {
+                    let low = page_num * page_size;
+                    let high = low + page_size - 1;
+
+                    // TODO: allocate remaining 64kb pages in this
+                    // region on demand in response to reads and
+                    // writes
+                    rom_ram_io.lease(
+                        Box::new(RandomAccessMemory::new(low, high)));
+                }
+            }
+            rom_ram_io.write_cells(&boot_code[0x10000..], 0x10000);
+        } else {
+            let boot_rom = ReadOnlyMemory::new(0x00000000, 0x0000ffff, boot_code);
+            rom_ram_io.lease(Box::new(boot_rom));
+        }
 
         let mut map = AddressSpace::from_range(0x00000000, 0xffffffff);
         map.lease(Box::new(rom_ram_io));
@@ -337,7 +363,7 @@ impl MemMap32 {
     }
 
     pub fn get32(&self, addr: Address, big_endian: bool) -> Option<u32> {
-        assert_eq!(1, mem::size_of::<Cell>());
+        debug_assert_eq!(1, mem::size_of::<Cell>());
         match self.address_space.read_cells(addr, addr + 3) {
             None => None,
             Some(cells) => {
