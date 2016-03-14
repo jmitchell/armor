@@ -503,7 +503,7 @@ mod test {
         fn data() -> Vec<Cell> {
             (0..512).map(val_for_address).collect()
         }
-        address_space.write_cells(data(), 0);
+        address_space.write_cells(&data()[..], 0);
 
         let recorded_data = address_space.read_cells(0, 511);
         assert!(recorded_data.is_some());
