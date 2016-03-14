@@ -328,4 +328,10 @@ mod test {
         // TODO: Test combinations of `Condition` and CPSR values.
         // Test both when condition is satisfied and not.
     }
+
+    // TODO: verify that a new RegisterFile starts in supervisor mode
+    // and using the ARM IS
+
+    // TODO: verify that after writing to a CPSR's mode, reads match
+    // the write, and that no write leads to a None read.
 }
