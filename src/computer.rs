@@ -159,6 +159,33 @@ impl Computer {
                 // TODO: Set T-flag to 'Rm & 1' (may enable Thumb
                 // mode)
             },
+            CondInstr::CMN { rn, ref shift_op } => {
+                let shift_result = self.execute_barrel_shift(shift_op);
+                let val = self.register(rn).unwrap().bits + shift_result;
+
+                let cpsr = self.register(RegisterBank::CPSR).unwrap();
+                // TODO: update C according to shifter carry
+                // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                // TODO: update V according to signed overflow check
+
+                cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
+                cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0); // TODO: test
+            },
+            CondInstr::CMP { rn, ref shift_op } => {
+                let shift_result = self.execute_barrel_shift(shift_op);
+                // TODO: test casting logic
+                let val = ((self.register(rn).unwrap().bits as i32) - (shift_result as i32)) as u32;
+
+                let cpsr = self.register(RegisterBank::CPSR).unwrap();
+                // TODO: update C according to shifter carry
+                // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                // TODO: update V according to signed overflow check
+
+                cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
+                cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0); // TODO: test
+            },
             CondInstr::LDR { rd, ref addr_ref } => {
                 let addr = {
                     let mut rn = self.register(*addr_ref.get_base()).unwrap();
@@ -234,13 +261,26 @@ impl Computer {
                 let mut rd = self.register(rd).unwrap();
                 rd.bits = sub;
             },
-            CondInstr::TEQ { rn, rotate, immed } => {
-                let shift = Self::ror(immed, 2 * rotate);
-                let val = self.register(rn).unwrap().bits ^ shift;
+            CondInstr::TEQ { rn, ref shift_op } => {
+                let shift_result = self.execute_barrel_shift(shift_op);
+                let val = self.register(rn).unwrap().bits ^ shift_result;
 
                 let cpsr = self.register(RegisterBank::CPSR).unwrap();
                 // TODO: update C according to shifter carry
                 // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
+                cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0); // TODO: test
+            },
+            CondInstr::TST { rn, ref shift_op } => {
+                let shift_result = self.execute_barrel_shift(shift_op);
+                let val = self.register(rn).unwrap().bits & shift_result;
+
+                let cpsr = self.register(RegisterBank::CPSR).unwrap();
+                // TODO: update C according to shifter carry
+                // cpsr.set_condition_flag(ConditionFlag::Carry, false);
+
+                // TODO: update V according to signed overflow check
 
                 cpsr.set_condition_flag(ConditionFlag::Zero, val == 0);
                 cpsr.set_condition_flag(ConditionFlag::Negative, (val as i32) < 0); // TODO: test

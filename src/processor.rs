@@ -323,6 +323,8 @@ pub enum CondInstr {
     BX(RegisterBank),
     BIC { s: bool, rd: RegisterBank, rn: RegisterBank, rotate: u32, immed: u32 },
     // LDR { u: bool, w: bool, rd: RegisterBank, rn: RegisterBank, immed12: u32 },
+    CMN { rn: RegisterBank, shift_op: BarrelShiftOp },
+    CMP { rn: RegisterBank, shift_op: BarrelShiftOp },
     LDR { rd: RegisterBank, addr_ref: WordOrUnsignedByte },
     LDRB { rd: RegisterBank, addr_ref: WordOrUnsignedByte },
     LDRH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
@@ -339,7 +341,8 @@ pub enum CondInstr {
     STRB { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     STRH { rd: RegisterBank, addr_ref: HalfwordOrSigned },
     SUB { s: bool, rd: RegisterBank, rn: RegisterBank, shift_op: BarrelShiftOp },
-    TEQ { rn: RegisterBank, rotate: u32, immed: u32 },
+    TEQ { rn: RegisterBank, shift_op: BarrelShiftOp },
+    TST { rn: RegisterBank, shift_op: BarrelShiftOp },
 
     // TODO: Remove when done. Helps avert unreachable pattern errors
     // during development.
@@ -469,6 +472,36 @@ impl Instruction {
                     } else {
                         None // BLX
                     }
+                } else if bits(code, 23, 23) == 0 && bits(code, 20, 20) == 1 && bits(code, 15, 12) == 0 && bits(code, 4, 4) == 0 {
+                    let rn = RegisterBank::decode(bits(code, 19, 16));
+                    let shift_op = BarrelShiftOp::decode(
+                        RegisterBank::decode(bits(code, 3, 0)),
+                        bits(code, 6, 5),
+                        ShiftSize::Imm(bits(code, 11, 7))).unwrap();
+
+                    match bits(code, 22, 21) {
+                        0b00 =>
+                            Some(CondInstr::TST {
+                                rn: rn,
+                                shift_op: shift_op
+                            }),
+                        0b01 =>
+                            Some(CondInstr::TEQ {
+                                rn: rn,
+                                shift_op: shift_op
+                            }),
+                        0b10 =>
+                            Some(CondInstr::CMP {
+                                rn: rn,
+                                shift_op: shift_op,
+                            }),
+                        0b11 =>
+                            Some(CondInstr::CMN {
+                                rn: rn,
+                                shift_op: shift_op
+                            }),
+                        _ => unreachable!()
+                    }
                 } else {
                     None
                 }
@@ -514,8 +547,10 @@ impl Instruction {
                             0b01 => {
                                 Some(CondInstr::TEQ {
                                     rn: rn,
-                                    rotate: rotate,
-                                    immed: immed
+                                    shift_op: BarrelShiftOp::RotateImmed {
+                                        immed: immed,
+                                        rotate: rotate,
+                                    },
                                 })
                             },
                             _ => None,
@@ -714,8 +749,10 @@ mod test {
              Instruction::Cond(
                  CondInstr::TEQ {
                      rn: RegisterBank::R1,
-                     rotate: 0,
-                     immed: 0b0011010,
+                     shift_op: BarrelShiftOp::RotateImmed {
+                         immed: 0b0011010,
+                         rotate: 0,
+                     },
                  },
                  Condition::AL)),
 
@@ -844,6 +881,14 @@ mod test {
                          immed: 0,
                          rotate: 0,
                      },
+                 },
+                 Condition::AL)),
+
+            (0b1110_0001_0101_0011_0000_0000_0000_0010,
+             Instruction::Cond(
+                 CondInstr::CMP {
+                     rn: RegisterBank::R3,
+                     shift_op: BarrelShiftOp::LSL(RegisterBank::R2, ShiftSize::Imm(0)),
                  },
                  Condition::AL)),
         ];
